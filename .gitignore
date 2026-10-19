@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# runtime / local
+.quar/
+config.toml
+rules/
+
+# tooling
+.serena/
+.pytest_cache/
+.ruff_cache/

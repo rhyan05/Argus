@@ -1,0 +1,39 @@
+[project]
+name = "verificador-de-arquivo"
+version = "0.1.0"
+description = "Scanner antivírus/malware local, CLI-first, com frontend local complementar"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "rich",
+    "pefile",
+    "oletools",
+    "py7zr",
+    "cryptography",
+]
+# yara-python fica de fora: sem wheel para 3.14 e exige compilador C.
+# Alternativa sem compilador: winget install VirusTotal.YARA (usada via CLI).
+
+[project.optional-dependencies]
+dev = ["ruff", "pytest"]
+
+[project.scripts]
+scanner = "scanner.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["scanner"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]  # comprimento de linha é do formatter, não do linter
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
