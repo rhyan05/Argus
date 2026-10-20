@@ -606,6 +606,23 @@ class TestPhase4(unittest.TestCase):
             )
         self.assertEqual(proc.returncode, 0, proc.stderr)
 
+    def test_guia_parsed_as_command(self):
+        from scanner.cli import parse_args
+
+        self.assertEqual(parse_args(["guia"]).command, "guia")
+
+    def test_guia_runs_offline(self):
+        # guia não pode depender de clamd/rede: ping mockado falha e o comando segue OK
+        import contextlib
+        import io
+
+        from scanner.cli import _cmd_guia
+        from scanner.config import load
+
+        with patch("scanner.core.analyze_clamd", side_effect=ConnectionError):
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(_cmd_guia(load()), 0)
+
 
 def _fake_handler(filename: str, payload: bytes, content_length: int | None = -1):
     """Handler sem socket: monta um POST multipart e captura o que ele responderia.

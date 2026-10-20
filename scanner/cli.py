@@ -22,7 +22,7 @@ from scanner.report import render
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog="scanner",
+        prog="verificador",
         description="Scanner antivírus/malware local.",
     )
     parser.add_argument("--config", help="Caminho do config.toml (default: ./config.toml).")
@@ -68,6 +68,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
 
     sub.add_parser("status", help="Checagem de saúde das engines (clamd, yara, vt).")
+    sub.add_parser("guia", help="Guia rápido: engines, uso e como configurar o VirusTotal.")
     p_upd = sub.add_parser("update-rules", help="Baixar regras YARA de uma URL.")
     p_upd.add_argument("url", help="URL do arquivo .yar.")
     p_upd.add_argument("-o", "--out", default="rules", help="Diretório de destino (default: rules/).")
@@ -148,7 +149,7 @@ def _cmd_scan(args, cfg) -> int:
     return 0
 
 
-def _cmd_status(cfg) -> int:
+def _engine_lines(cfg) -> list[str]:
     import os
 
     from scanner.core import HAS_YARA, YARA_CLI, analyze_clamd
@@ -176,11 +177,73 @@ def _cmd_status(cfg) -> int:
         lines.append(f"clamd     : [green]respondendo em {host}:{port}[/green]")
     except Exception as e:
         lines.append(f"clamd     : [yellow]sem resposta em {host}:{port} ({type(e).__name__})[/yellow]")
+    return lines
 
+
+def _cmd_status(cfg) -> int:
     from rich.console import Console
     from rich.panel import Panel
 
-    Console().print(Panel("\n".join(lines), title="Status das engines"))
+    Console().print(Panel("\n".join(_engine_lines(cfg)), title="Status das engines"))
+    return 0
+
+
+def _cmd_guia(cfg) -> int:
+    import os
+
+    from rich.console import Console
+    from rich.markdown import Markdown
+    from rich.panel import Panel
+
+    console = Console()
+    console.print(Panel("\n".join(_engine_lines(cfg)), title="Engines disponíveis"))
+
+    vt_status = (
+        "chave presente — engine ativa"
+        if os.environ.get("VT_API_KEY")
+        else "sem chave — engine desligada (opcional)"
+    )
+    console.print(
+        Markdown(
+            f"""# Guia rápido
+
+Scanner local de malware, focado no terminal. Varre arquivos e pastas e mostra o
+veredito por arquivo, além de quais engines rodaram.
+
+## Comandos básicos
+
+| Comando | O que faz |
+|---|---|
+| `verificador scan <arquivo-ou-pasta>` | Varre e mostra o relatório |
+| `verificador status` | Saúde das engines |
+| `verificador web` | Interface local (arrastar e soltar) |
+| `verificador update-rules <url>` | Baixa regras YARA |
+
+**Dica:** em modo de desenvolvimento (sem instalar), troque `verificador` por `python -m scanner`.
+
+## VirusTotal (opcional)
+
+Status: **{vt_status}**
+
+A engine consulta a reputação pelo **hash SHA-256** — o arquivo não é enviado.
+
+1. Crie uma conta e pegue a chave grátis em https://www.virustotal.com/gui/my-apikey
+2. Configure:
+   - Windows (PowerShell): `setx VT_API_KEY "sua-chave"` (reabra o terminal)
+   - Linux/macOS/WSL: `export VT_API_KEY="sua-chave"`
+3. Confira com `verificador status` (deve mostrar "chave presente").
+
+O plano grátis limita a ~4 requisições/min. Em pastas grandes use
+`--vt-only-suspicious`; para desligar, use `--no-vt`.
+
+## Próximo passo
+
+    verificador scan .
+
+Sem a chave do VirusTotal tudo funciona; apenas essa engine é pulada.
+"""
+        )
+    )
     return 0
 
 
@@ -214,6 +277,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_scan(args, cfg)
     if args.command == "status":
         return _cmd_status(cfg)
+    if args.command == "guia":
+        return _cmd_guia(cfg)
     if args.command == "update-rules":
         return _cmd_update_rules(args)
     if args.command == "web":

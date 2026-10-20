@@ -4,6 +4,22 @@ version = "0.1.0"
 description = "Scanner antivírus/malware local, CLI-first, com frontend local complementar"
 readme = "README.md"
 requires-python = ">=3.11"
+authors = [{ name = "Rhyan Lemos Silveira" }]
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["antivirus", "malware", "scanner", "yara", "clamav", "virustotal", "security", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Security",
+]
 dependencies = [
     "rich",
     "pefile",
@@ -15,13 +31,18 @@ dependencies = [
 # Alternativa sem compilador: winget install VirusTotal.YARA (usada via CLI).
 
 [project.optional-dependencies]
-dev = ["ruff", "pytest"]
+dev = ["ruff", "pytest", "build", "twine", "python-dotenv"]
 
 [project.scripts]
-scanner = "scanner.cli:main"
+verificador = "scanner.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/rhyan05/scan-de-arquivos"
+Repository = "https://github.com/rhyan05/scan-de-arquivos"
+Issues = "https://github.com/rhyan05/scan-de-arquivos/issues"
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]

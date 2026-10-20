@@ -5,8 +5,18 @@ Scanner antivírus/malware local, multiplataforma (PowerShell, cmd, WSL, macOS),
 
 ## Instalação
 
-Tutorial passo a passo. O scanner roda só com Python — as engines externas (ClamAV,
-YARA, VirusTotal) são **opcionais** e, sem elas, são ignoradas silenciosamente no status.
+Via PyPI (recomendado):
+
+```powershell
+pip install verificador-de-arquivo
+verificador guia
+```
+
+O comando `verificador` fica disponível no ambiente; `python -m scanner` também funciona.
+
+**A partir do código (desenvolvimento):** o scanner roda só com Python — as engines
+externas (ClamAV, YARA, VirusTotal) são **opcionais** e, sem elas, são ignoradas
+silenciosamente no status.
 
 ### Pré-requisitos
 
@@ -53,13 +63,14 @@ pip install -e ".[dev]"          # instala o scanner + ruff/pytest (modo editáv
 ```
 
 Só o essencial (sem ferramentas de dev): `pip install -r requirements.txt`.
-O `-e .` também cria o atalho `scanner` no PATH do venv — a partir daí
-`scanner scan ...` e `python -m scanner scan ...` são equivalentes.
+O `-e .` também cria o atalho `verificador` no PATH do venv — a partir daí
+`verificador scan ...` e `python -m scanner scan ...` são equivalentes.
 
 ### Passo 4 — Verificar a instalação
 
 ```powershell
-python -m scanner status
+verificador status
+verificador guia      # guia rápido: engines, comandos e VirusTotal
 ```
 
 Saída esperada: uma linha por engine. As que funcionam mostram o que foi encontrado
@@ -82,7 +93,7 @@ TCPSocket 3310
 TCPAddr 127.0.0.1
 ```
 
-Depois rode `clamd.exe` (ou instale como serviço). Teste com `python -m scanner status`.
+Depois rode `clamd.exe` (ou instale como serviço). Teste com `verificador status`.
 
 **Debian/Ubuntu:**
 
@@ -134,6 +145,7 @@ para diretórios grandes, use `--vt-only-suspicious` (consulta só arquivos já 
 | `'python' não é reconhecido` | Python fora do PATH | Reinstale marcando "Add to PATH", ou use `py -3` |
 | `Activate.ps1 ... desabilitado` | política de execução do PowerShell | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
 | `ModuleNotFoundError: scanner` | rodou fora da pasta/venv | Ative o venv e rode da raiz do projeto |
+| `'verificador' não é reconhecido` | pacote não instalado ou venv inativo | `pip install verificador-de-arquivo` no venv ativo |
 | engine `clamav` = `-` (ConnectionRefusedError) | `clamd` não está rodando | Inicie o `clamd` e confira `TCPSocket 3310` |
 | engine `yara` = `-` | binário fora do PATH | Instale o YARA ou defina `YARA_PATH` |
 | `status` mostra `virustotal: sem VT_API_KEY` | chave ausente | Exporte a chave e reabra o terminal |
@@ -142,19 +154,20 @@ para diretórios grandes, use `--vt-only-suspicious` (consulta só arquivos já 
 ## Uso rápido
 
 ```powershell
-python -m scanner scan C:\pasta               # console com barra de progresso
-python -m scanner scan C:\pasta --format json
-python -m scanner scan C:\pasta --format csv
-python -m scanner scan C:\pasta --format html
-python -m scanner scan C:\pasta --quarantine  # move malware p/ .quar cifrado (AES-256)
-python -m scanner scan C:\pasta --rules minhas.yar
-python -m scanner scan C:\pasta --rules-dir rules   # carrega todos os *.yar
-python -m scanner scan C:\pasta --max-file-size 1g   # inclui arquivos grandes (0 = ilimitado)
-python -m scanner scan C:\pasta --vt-only-suspicious # VirusTotal só em suspeitos (poupa rate limit)
-python -m scanner status                      # saúde das engines (inclui ping real no clamd)
-python -m scanner web                         # frontend: http://127.0.0.1:8080
-python -m scanner web --open                  # janela nativa (requer pywebview)
-python -m scanner update-rules <url>          # baixa regras YARA p/ rules/
+verificador guia                             # tutorial: engines, uso e como configurar o VirusTotal
+verificador scan C:\pasta                    # console com barra de progresso
+verificador scan C:\pasta --format json
+verificador scan C:\pasta --format csv
+verificador scan C:\pasta --format html
+verificador scan C:\pasta --quarantine        # move malware p/ .quar cifrado (AES-256)
+verificador scan C:\pasta --rules minhas.yar
+verificador scan C:\pasta --rules-dir rules   # carrega todos os *.yar
+verificador scan C:\pasta --max-file-size 1g  # inclui arquivos grandes (0 = ilimitado)
+verificador scan C:\pasta --vt-only-suspicious # VirusTotal só em suspeitos (poupa rate limit)
+verificador status                            # saúde das engines (inclui ping real no clamd)
+verificador web                               # frontend: http://127.0.0.1:8080
+verificador web --open                        # janela nativa (requer pywebview)
+verificador update-rules <url>                # baixa regras YARA p/ rules/
 ```
 
 ## Configuração (`config.toml`)

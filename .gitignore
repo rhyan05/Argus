@@ -9,6 +9,11 @@ dist/
 config.toml
 rules/
 
+# credenciais locais de publicacao
+.env
+.env.*
+!.env.example
+
 # tooling
 .serena/
 .pytest_cache/
