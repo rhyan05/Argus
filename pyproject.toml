@@ -1,6 +1,6 @@
 [project]
 name = "verificador-de-arquivo"
-version = "0.1.0"
+version = "0.1.1"
 description = "Scanner antivírus/malware local, CLI-first, com frontend local complementar"
 readme = "README.md"
 requires-python = ">=3.11"
