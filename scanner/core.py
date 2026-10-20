@@ -1,7 +1,7 @@
 """Núcleo: hashing, engines e loop de varredura.
 
 Engines são funções `analyze_*(path, data=None) -> EngineResult` — nenhuma classe abstrata
-necessária com poucas engines (`ponytail: vira classe quando passar de ~7 engines`).
+necessária com poucas engines.
 Com `data=None` a engine lê o arquivo pelo `path` (mmap/streaming); `data` existe para
 conteúdo em memória que não pode ir a disco (fixtures EICAR dos testes).
 """
@@ -116,7 +116,6 @@ def analyze_clamd(
 
     Com `path`, envia o arquivo em blocos direto do disco — sem carregar em memória.
     """
-    # ponytail: cliente socket próprio (~20 linhas) em vez de pyclamd (abandonado).
     with socket.create_connection((host, port), timeout=5) as sock:
         sock.sendall(b"zINSTREAM\0")
         if path is not None:
@@ -144,8 +143,8 @@ def analyze_clamd(
 def _rules_source(extra_rules: str, rules_dir: str | None) -> str:
     """Fontes YARA = EICAR embutida + extras do usuário (string ou diretório).
 
-    ponytail: `lru_cache` evita reler o rules_dir a cada arquivo do diretório varrido.
-    maxsize=8 porque fontes de regra podem ter MBs e há pouquíssimas combinações.
+    O lru_cache evita reler o rules_dir a cada arquivo; maxsize=8 porque fontes de
+    regra podem ter MBs e há pouquíssimas combinações.
     """
     sources = EICAR_RULE + extra_rules
     if rules_dir:
@@ -232,8 +231,7 @@ def analyze_yara(
 def analyze_builtin(data: bytes | None = None, path=None) -> EngineResult:
     """Matcher assinatura por substring — cobre o EICAR sem depender do yara.
 
-    ponytail: fica como rede de segurança caso nem o módulo nem o CLI do yara existam;
-    se o yara for garantido no ambiente-alvo, este engine é dispensável.
+    Fica como rede de segurança caso nem o módulo nem o CLI do yara existam.
     """
     if data is not None:
         hit = EICAR in data
@@ -275,12 +273,10 @@ def scan_file(
             # clamd ausente/fora — isolamento de erros: não derruba o pipeline
             runs.append(EngineRun("clamav", SKIP_UNAVAILABLE, type(e).__name__))
 
-    # Fase 2 — análise estática (pefile/oletools/py7zr opcionais, ver engines.py)
     record("pe", analyze_pe(path))
     record("doc", analyze_docs(path))
     record("archive", analyze_archive(path))
 
-    # Fase 3 — VirusTotal por hash (cache + rate limit); engine desligada se não configurada.
     # `vt_only_suspicious` evita gastar o rate limit (~15 s/req) em arquivos já limpos.
     if vt is not None and (
         not vt_only_suspicious or any(f.severity in ACTIONABLE for f in findings)
@@ -291,7 +287,6 @@ def scan_file(
             findings.append(vt_finding)
         runs.append(EngineRun("virustotal", RAN))
 
-    # Fase 3 — quarentena cifrada de arquivos confirmados maliciosos
     if quarantine_dir is not None and any(f.severity == "malware" for f in findings):
         from scanner.quarantine import quarantine_file
 

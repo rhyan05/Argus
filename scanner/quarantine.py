@@ -28,7 +28,7 @@ def load_key(quar_dir: Path) -> bytes:
         try:
             key_path.chmod(0o600)
         except OSError:
-            pass  # chmod não aplicável em alguns FS — ponytail: garantir ACL no deploy
+            pass  # chmod pode falhar em alguns filesystems
     return key_path.read_bytes()
 
 

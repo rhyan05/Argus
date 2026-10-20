@@ -1,9 +1,4 @@
-"""Frontend local — servidor HTTP stdlib servindo página de upload + disparo do scan.
-
-Fase 5 (complemento). Sem framework: http.server + multipart parse caseiro.
-ponytail: migrar para aiohttp/FastAPI + upload streaming quando precisar
-de concorrência ou arquivos > dezenas de MB; pywebview só empacota (ver _serve).
-"""
+"""Servidor HTTP local: página de upload e endpoint de scan."""
 
 from __future__ import annotations
 

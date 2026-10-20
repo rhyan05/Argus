@@ -1,4 +1,4 @@
-"""Ponto de entrada CLI — argparse."""
+"""CLI do verificador."""
 
 from __future__ import annotations
 
@@ -114,8 +114,6 @@ def _cmd_scan(args, cfg) -> int:
             print(f"ERRO: --max-file-size inválido: {args.max_file_size}", file=sys.stderr)
             return 1
 
-    # ponytail: rich.Progress em thread da console principal; scan sequencial —
-    # paralelizar (ProcessPoolExecutor) quando varredura de dir grande medir lento.
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -169,8 +167,6 @@ def _engine_lines(cfg) -> list[str]:
     lines.append(f"py7zr     : {HAS_PY7ZR}")
     lines.append(f"virustotal: {'[green]chave presente[/green]' if os.environ.get('VT_API_KEY') else '[yellow]sem VT_API_KEY[/yellow]'}")
 
-    # PRD pede "checagem de integridade do serviço clamd" — Presence ping não basta:
-    # connect + PING/PONG prova que o daemon responde de verdade.
     host, port = cfg["clamd"]["host"], cfg["clamd"]["port"]
     try:
         analyze_clamd(b"", host, port)

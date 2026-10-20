@@ -1,17 +1,12 @@
-"""Tipos compartilhados — evita import circular entre core, engines e vt.
-
-(Chamava-se `types.py`; renomeado para não sombrear o módulo `types` do stdlib.)
-"""
+"""Tipos compartilhados do scanner."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-# Severidades
 SEVERITIES = ("info", "suspicious", "malware")
 ACTIONABLE = ("suspicious", "malware")  # severidades que marcam o arquivo como sujo
 
-# Status de execução de uma engine sobre um arquivo
 RAN = "ran"
 SKIP_SIZE = "tamanho"            # arquivo grande demais para a engine
 SKIP_UNAVAILABLE = "indisponivel"  # dependência/serviço ausente

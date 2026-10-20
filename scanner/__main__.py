@@ -1,4 +1,4 @@
-"""Verificador de Arquivo — scanner antivírus/malware (Fase 1).
+"""Verificador de Arquivo — scanner antivírus/malware.
 
 Uso: python -m scanner scan <caminho> [--format json|csv] [--rules arquivo.yar]
 """

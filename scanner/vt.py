@@ -1,8 +1,4 @@
-"""VirusTotal — consulta de reputação por hash SHA-256, com cache SQLite e rate limit.
-
-Sem httpx: `urllib.request` do stdlib cobre um GET por hash no loop sequencial.
-ponytail: async/httpx + upload de arquivos (>hash) quando throughput/concorrência exigir.
-"""
+"""VirusTotal — consulta de reputação por hash SHA-256, com cache SQLite e rate limit."""
 
 from __future__ import annotations
 
@@ -65,7 +61,7 @@ class VTCache:
 
 
 class RateLimit:
-    """Pausa entre requisições — ponytail: token-bucket/fila quando houver concorrência."""
+    """Pausa entre requisições."""
 
     def __init__(self, interval: float = RATE_INTERVAL):
         self.interval = interval
@@ -107,7 +103,7 @@ def check_vt(sha256: str, cache: VTCache, limiter: RateLimit, api_key: str) -> F
         if e.code == 404:
             cache.put(sha256, NO_REPUTATION, "info")
             return None
-        return None  # 429/limite — ponytail: backoff exponencial quando relevante
+        return None  # 429/limite
     except (urllib.error.URLError, OSError, ValueError):
         return None
 

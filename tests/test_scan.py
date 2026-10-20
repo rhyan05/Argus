@@ -1,4 +1,4 @@
-"""Testes da Fase 1 — EICAR 100% em memória (nunca em disco: o Defender do host apagaria)."""
+"""Testes do scanner — EICAR 100% em memória (o Defender do host apagaria em disco)."""
 
 import sys
 import tempfile

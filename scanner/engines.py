@@ -1,4 +1,4 @@
-"""Fase 2 — análise estática: PE/assinatura/packers, documentos OLE e compactados.
+"""Análise estática: PE/assinatura/packers, documentos OLE e compactados.
 
 Engines seguem o contrato `analyze_*(path, data=None) -> EngineResult`. Com `data=None`
 a engine lê o arquivo pelo `path` (mmap/streaming, sem carregar tudo); com `data` usa os
@@ -41,7 +41,7 @@ try:
 except ImportError:
     HAS_PY7ZR = False
 
-# Limites heurísticos (ceiling configurável na Fase 4 via config.toml)
+# Limites heurísticos
 PACKER_ENTROPY = 6.5       # entropia de seção acima disso ~ conteúdo empacotado/cifrado
 ENTROPY_MAX_SECTION = 64 * 1024 * 1024  # acima disso não calcula entropia (evita copiar seção)
 SUSPECT_SECTIONS = {"UPX0", "UPX1", "UPX2", ".themida", ".vmp0", ".vmp1", ".nsp0", ".nsp1"}
@@ -123,21 +123,18 @@ def analyze_pe(path, data: bytes | None = None) -> EngineResult:
             ]
         )
 
-        # Assinatura digital
         issuer = _extract_cert_info(pe)
         if issuer:
             findings.append(Finding("pe", f"assinatura-digital ({issuer})", "info"))
         else:
             findings.append(Finding("pe", "sem-assinatura-digital", "suspicious"))
 
-        # ASLR / DEP
         dllchars = pe.OPTIONAL_HEADER.DllCharacteristics
         if not (dllchars & 0x0040):
             findings.append(Finding("pe", "ASLR-desabilitado", "suspicious"))
         if not (dllchars & 0x0100):
             findings.append(Finding("pe", "DEP-desabilitado", "suspicious"))
 
-        # Seções W+X e entropia (packers)
         for sec in pe.sections:
             name = sec.Name.rstrip(b"\0").decode(errors="replace").strip()
             flags = sec.Characteristics
@@ -145,7 +142,7 @@ def analyze_pe(path, data: bytes | None = None) -> EngineResult:
             executable = bool(flags & 0x20000000)
             if writable and executable:
                 findings.append(Finding("pe", f"secao-W+X:{name}", "suspicious"))
-            # ponytail: get_data() copia a seção; pula entropia em seção gigante
+            # get_data() copia a seção; evita entropia em seção gigante
             if (sec.SizeOfRawData or 0) <= ENTROPY_MAX_SECTION:
                 ent = shannon_entropy(sec.get_data())
                 if ent > PACKER_ENTROPY:

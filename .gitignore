@@ -14,6 +14,10 @@ rules/
 .env.*
 !.env.example
 
+# documentos locais (nao versionar)
+PRD.md
+PUBLICAR-PYPI.md
+
 # tooling
 .serena/
 .pytest_cache/
