@@ -31,7 +31,8 @@ dependencies = [
 # Alternativa sem compilador: winget install VirusTotal.YARA (usada via CLI).
 
 [project.optional-dependencies]
-dev = ["ruff", "pytest", "build", "twine", "python-dotenv"]
+gui = ["pywebview"]
+dev = ["ruff", "pytest", "build", "twine"]
 
 [project.scripts]
 verificador = "scanner.cli:main"

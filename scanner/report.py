@@ -29,6 +29,18 @@ def _engines_label(r: Result) -> str:
     return f"{r.engines_ran}/{r.engines_total}"
 
 
+def _entries(results: list[Result]):
+    """Classificação comum aos formatadores: (result, status, engines, findings)."""
+    for r in results:
+        status = _status(r)
+        if r.skipped:
+            yield r, status, "-", []
+        elif not r.findings:
+            yield r, status, _engines_label(r), []
+        else:
+            yield r, status, _engines_label(r), r.findings
+
+
 def _run_marks(r: Result) -> str:
     """Marcas por engine: + rodou, - pulou (tamanho/indisponível), . não se aplica.
 
@@ -76,20 +88,20 @@ def to_json(results: list[Result]) -> str:
 
 def to_csv(results: list[Result]) -> str:
     buf = io.StringIO()
-    writer = csv.writer(buf)
+    writer = csv.writer(buf, lineterminator="\n")
     writer.writerow(
         ["path", "sha256", "sha1", "md5", "status", "severity", "engine", "signature", "engines", "skip_reason"]
     )
-    for r in results:
+    for r, status, engines, findings in _entries(results):
         if r.skipped:
-            writer.writerow([r.path, "", "", "", "SKIPPED", "", "", "", "-", r.skip_reason])
+            writer.writerow([r.path, "", "", "", status, "", "", "", engines, r.skip_reason])
             continue
-        if not r.findings:
-            writer.writerow([r.path, r.sha256, r.sha1, r.md5, "CLEAN", "", "", "", _engines_label(r), ""])
+        if not findings:
+            writer.writerow([r.path, r.sha256, r.sha1, r.md5, status, "", "", "", engines, ""])
             continue
-        for f in r.findings:
+        for f in findings:
             writer.writerow(
-                [r.path, r.sha256, r.sha1, r.md5, _status(r), f.severity, f.engine, f.signature, _engines_label(r), ""]
+                [r.path, r.sha256, r.sha1, r.md5, status, f.severity, f.engine, f.signature, engines, ""]
             )
     return buf.getvalue()
 
@@ -110,19 +122,18 @@ def to_console(results: list[Result]) -> None:
     table.add_column("Status")
     table.add_column("Engines")
     table.add_column("Detalhe", overflow="fold")
-    for r in results:
-        st = _status(r)
+    for r, st, engines, findings in _entries(results):
         status = f"[{_STATUS_STYLE[st]}]{st}[/{_STATUS_STYLE[st]}]"
         if r.skipped:
-            table.add_row(r.path, status, "-", f"[yellow]{r.skip_reason}[/yellow]")
-        elif not r.findings:
-            table.add_row(r.path, status, _engines_label(r), "-")
+            table.add_row(r.path, status, engines, f"[yellow]{r.skip_reason}[/yellow]")
+        elif not findings:
+            table.add_row(r.path, status, engines, "-")
         else:
             detail = "\n".join(
                 f"[{_SEV_STYLE.get(f.severity, 'white')}]{f.engine}: {f.signature} ({f.severity})[/]"
-                for f in r.findings
+                for f in findings
             )
-            table.add_row(r.path, status, _engines_label(r), detail)
+            table.add_row(r.path, status, engines, detail)
     console.print(table)
 
     # bloco de detalhe por engine — só quando alguma que devia rodar não rodou
@@ -157,26 +168,25 @@ def to_console(results: list[Result]) -> None:
 
 def to_html(results: list[Result]) -> str:
     rows = []
-    for r in results:
-        st = _status(r)
+    for r, st, engines, findings in _entries(results):
         cls = st.lower()
         if r.skipped:
             rows.append(
-                f"<tr><td>{_esc(r.path)}</td><td class='{cls}'>SKIPPED</td><td>-</td>"
+                f"<tr><td>{_esc(r.path)}</td><td class='{cls}'>SKIPPED</td><td>{engines}</td>"
                 f"<td>{_esc(r.skip_reason)}</td></tr>"
             )
-        elif not r.findings:
+        elif not findings:
             rows.append(
                 f"<tr><td>{_esc(r.path)}</td><td class='clean'>CLEAN</td>"
-                f"<td>{_engines_label(r)}</td><td>-</td></tr>"
+                f"<td>{engines}</td><td>-</td></tr>"
             )
         else:
             detail = "<br>".join(
-                f"{_esc(f.engine)}: {_esc(f.signature)} ({_esc(f.severity)})" for f in r.findings
+                f"{_esc(f.engine)}: {_esc(f.signature)} ({_esc(f.severity)})" for f in findings
             )
             rows.append(
                 f"<tr><td>{_esc(r.path)}</td><td class='{cls}'>{st}</td>"
-                f"<td>{_engines_label(r)}</td><td>{detail}</td></tr>"
+                f"<td>{engines}</td><td>{detail}</td></tr>"
             )
     table = "\n".join(rows)
     return f"""<!doctype html>

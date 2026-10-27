@@ -1,0 +1,4 @@
+Arquivo de exemplo para a regra YARA examples/regras/exemplo.yar.
+
+O texto abaixo contém o marcador que a regra procura:
+MALTEST-EXEMPLO

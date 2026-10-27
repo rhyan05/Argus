@@ -8,12 +8,11 @@ SEVERITIES = ("info", "suspicious", "malware")
 ACTIONABLE = ("suspicious", "malware")  # severidades que marcam o arquivo como sujo
 
 RAN = "ran"
-SKIP_SIZE = "tamanho"            # arquivo grande demais para a engine
 SKIP_UNAVAILABLE = "indisponivel"  # dependência/serviço ausente
 SKIP_NA = "nao-aplicavel"        # tipo de arquivo não bate com a engine
 
-# Só `tamanho` e `indisponivel` contam como "deveria ter rodado"; `nao-aplicavel` não.
-COUNTED_SKIPS = (SKIP_SIZE, SKIP_UNAVAILABLE)
+# Só `indisponivel` conta como "deveria ter rodado"; `nao-aplicavel` não.
+COUNTED_SKIPS = (SKIP_UNAVAILABLE,)
 
 
 @dataclass

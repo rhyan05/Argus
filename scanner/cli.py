@@ -3,9 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
+import threading
+import urllib.request
 from pathlib import Path
 
+from rich.console import Console
+from rich.markdown import Markdown
+from rich.panel import Panel
 from rich.progress import (
     BarColumn,
     Progress,
@@ -16,7 +22,15 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from scanner.core import scan
+from scanner.core import parse_size, scan
+from scanner.engines import (
+    HAS_OLETOOLS,
+    HAS_PEFILE,
+    HAS_PY7ZR,
+    HAS_YARA,
+    YARA_CLI,
+    analyze_clamd,
+)
 from scanner.report import render
 
 
@@ -72,6 +86,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p_upd = sub.add_parser("update-rules", help="Baixar regras YARA de uma URL.")
     p_upd.add_argument("url", help="URL do arquivo .yar.")
     p_upd.add_argument("-o", "--out", default="rules", help="Diretório de destino (default: rules/).")
+    p_restore = sub.add_parser("restore", help="Restaurar um arquivo da quarentena.")
+    p_restore.add_argument("enc", help="Arquivo .enc da quarentena.")
+    p_restore.add_argument(
+        "-o", "--out", required=True, help="Destino do arquivo restaurado."
+    )
     p_web = sub.add_parser("web", help="Servir o frontend local (upload + scan).")
     p_web.add_argument("--host", default="127.0.0.1")
     p_web.add_argument("--port", type=int, default=8080)
@@ -79,10 +98,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _write_report(out: str) -> None:
+    """Saída de máquina (json/csv/html): UTF-8 e LF mesmo redirecionada no Windows."""
+    stream = sys.stdout
+    if hasattr(stream, "reconfigure") and not stream.isatty():
+        stream.reconfigure(encoding="utf-8", newline="\n")
+    stream.write(out if out.endswith("\n") else out + "\n")
+
+
 def _cmd_scan(args, cfg) -> int:
     extra_rules = ""
     if args.rules:
-        extra_rules = Path(args.rules).read_text(encoding="utf-8")
+        try:
+            extra_rules = Path(args.rules).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as e:
+            print(f"ERRO: não foi possível ler --rules: {e}", file=sys.stderr)
+            return 1
     rules_dir = args.rules_dir or cfg.get("rules_dir")
 
     root = Path(args.path)
@@ -104,8 +135,6 @@ def _cmd_scan(args, cfg) -> int:
 
     clamd_cfg = cfg["clamd"]
 
-    from scanner.core import parse_size
-
     max_file_size = cfg.get("max_file_size")
     if args.max_file_size is not None:
         try:
@@ -122,6 +151,7 @@ def _cmd_scan(args, cfg) -> int:
         TimeElapsedColumn(),
         TimeRemainingColumn(),
         transient=True,
+        console=Console(stderr=True),
     ) as progress:
         task = progress.add_task("Varrendo...", total=None)
         results = scan(
@@ -143,16 +173,11 @@ def _cmd_scan(args, cfg) -> int:
 
     out = render(results, args.format)
     if out:
-        print(out)
-    return 0
+        _write_report(out)
+    return 1 if any(f.severity == "malware" for r in results for f in r.findings) else 0
 
 
 def _engine_lines(cfg) -> list[str]:
-    import os
-
-    from scanner.core import HAS_YARA, YARA_CLI, analyze_clamd
-    from scanner.engines import HAS_OLETOOLS, HAS_PEFILE, HAS_PY7ZR
-
     if HAS_YARA:
         yara_line = "[green]módulo Python[/green]"
     elif YARA_CLI:
@@ -169,7 +194,7 @@ def _engine_lines(cfg) -> list[str]:
 
     host, port = cfg["clamd"]["host"], cfg["clamd"]["port"]
     try:
-        analyze_clamd(b"", host, port)
+        analyze_clamd(host, port)
         lines.append(f"clamd     : [green]respondendo em {host}:{port}[/green]")
     except Exception as e:
         lines.append(f"clamd     : [yellow]sem resposta em {host}:{port} ({type(e).__name__})[/yellow]")
@@ -177,20 +202,11 @@ def _engine_lines(cfg) -> list[str]:
 
 
 def _cmd_status(cfg) -> int:
-    from rich.console import Console
-    from rich.panel import Panel
-
     Console().print(Panel("\n".join(_engine_lines(cfg)), title="Status das engines"))
     return 0
 
 
 def _cmd_guia(cfg) -> int:
-    import os
-
-    from rich.console import Console
-    from rich.markdown import Markdown
-    from rich.panel import Panel
-
     console = Console()
     console.print(Panel("\n".join(_engine_lines(cfg)), title="Engines disponíveis"))
 
@@ -213,6 +229,7 @@ veredito por arquivo, além de quais engines rodaram.
 | `verificador scan <arquivo-ou-pasta>` | Varre e mostra o relatório |
 | `verificador status` | Saúde das engines |
 | `verificador web` | Interface local (arrastar e soltar) |
+| `verificador restore <enc> -o <destino>` | Restaura um arquivo da quarentena |
 | `verificador update-rules <url>` | Baixa regras YARA |
 
 **Dica:** em modo de desenvolvimento (sem instalar), troque `verificador` por `python -m scanner`.
@@ -244,8 +261,6 @@ Sem a chave do VirusTotal tudo funciona; apenas essa engine é pulada.
 
 
 def _cmd_update_rules(args) -> int:
-    import urllib.request
-
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     target = out / Path(args.url).name
@@ -257,6 +272,28 @@ def _cmd_update_rules(args) -> int:
         print(f"ERRO: {e}", file=sys.stderr)
         return 1
     print(f"OK: {target} ({target.stat().st_size} bytes)")
+    return 0
+
+
+def _cmd_restore(args) -> int:
+    from scanner.quarantine import decrypt_to
+
+    enc = Path(args.enc)
+    if not enc.is_file():
+        print(f"ERRO: arquivo não existe: {enc}", file=sys.stderr)
+        return 1
+    key_path = enc.parent / "key.key"
+    if not key_path.is_file():
+        print(f"ERRO: chave da quarentena não encontrada: {key_path}", file=sys.stderr)
+        return 1
+
+    out = Path(args.out)
+    try:
+        size = decrypt_to(enc, out, key_path.read_bytes())
+    except OSError as e:
+        print(f"ERRO: {e}", file=sys.stderr)
+        return 1
+    print(f"OK: {out} ({size} bytes)")
     return 0
 
 
@@ -277,13 +314,13 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_guia(cfg)
     if args.command == "update-rules":
         return _cmd_update_rules(args)
+    if args.command == "restore":
+        return _cmd_restore(args)
     if args.command == "web":
         from scanner.web import serve
 
         if args.open:
             try:
-                import threading
-
                 import webview  # type: ignore
 
                 t = threading.Thread(target=serve, args=(args.host, args.port), daemon=True)
@@ -295,7 +332,6 @@ def main(argv: list[str] | None = None) -> int:
                 print("pywebview não instalado — servindo no navegador.", file=sys.stderr)
         serve(args.host, args.port)
         return 0
-    print(f"Comando não implementado: {args.command}", file=sys.stderr)
     return 2
 
 

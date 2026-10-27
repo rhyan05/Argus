@@ -62,7 +62,7 @@ source .venv/bin/activate
 pip install -e ".[dev]"          # instala o scanner + ruff/pytest (modo editável)
 ```
 
-Só o essencial (sem ferramentas de dev): `pip install -r requirements.txt`.
+Só o essencial (sem ferramentas de dev): `pip install .`.
 O `-e .` também cria o atalho `verificador` no PATH do venv — a partir daí
 `verificador scan ...` e `python -m scanner scan ...` são equivalentes.
 
@@ -162,13 +162,18 @@ verificador scan C:\pasta --format html
 verificador scan C:\pasta --quarantine        # move malware p/ .quar cifrado (AES-256)
 verificador scan C:\pasta --rules minhas.yar
 verificador scan C:\pasta --rules-dir rules   # carrega todos os *.yar
+verificador --config examples/config.toml scan examples/arquivos  # exemplos do repositório
 verificador scan C:\pasta --max-file-size 1g  # inclui arquivos grandes (0 = ilimitado)
 verificador scan C:\pasta --vt-only-suspicious # VirusTotal só em suspeitos (poupa rate limit)
 verificador status                            # saúde das engines (inclui ping real no clamd)
+verificador restore .quar/foo.exe.ab12cd34.enc -o foo.exe  # restaura da quarentena
 verificador web                               # frontend: http://127.0.0.1:8080
-verificador web --open                        # janela nativa (requer pywebview)
+verificador web --open                        # janela nativa (pip install -e ".[gui]")
 verificador update-rules <url>                # baixa regras YARA p/ rules/
 ```
+
+`scan` retorna código de saída `1` quando encontra malware (e `0` quando só há
+suspeitas/observações), para uso em scripts e CI.
 
 ## Configuração (`config.toml`)
 
@@ -177,6 +182,7 @@ Procurado em `./config.toml`, depois `~/.config/scanner.toml`. Valores ausentes 
 ```toml
 exclude = ["cache.tmp", "thumbs.db", "node_modules"]  # casa com QUALQUER componente do caminho
 max_file_size = 104857600       # bytes; acima disso é pulado (aparece como SKIPPED)
+rules_dir = "rules"             # diretório default de regras YARA (--rules-dir sobrescreve)
 
 [clamd]
 host = "127.0.0.1"
@@ -189,9 +195,6 @@ cache = ".quar/vt-cache.db"
 
 [quarantine]
 dir = ".quar"
-
-[rules_dir]
-# caminho default de regras YARA — usável com --rules-dir
 ```
 
 ## Motores
@@ -226,10 +229,11 @@ deveria rodar não rodou, um bloco com o motivo:
 ## Arquivos grandes
 
 O scan **não carrega o arquivo inteiro na memória**: o hashing é feito em blocos e cada
-engine lê do próprio arquivo (`mmap` no YARA/PE, índice central no ZIP). Um arquivo de
-1 GB é varrido com pico de memória de ~18 MB. O `max_file_size` (default 100 MB) é só um
-teto de tempo/segurança — passe `--max-file-size 0` para não ter limite. Arquivos pulados
-aparecem como `SKIPPED` no relatório, com o motivo.
+engine lê do próprio arquivo (`mmap` no YARA/PE, índice central no ZIP). O consumo é
+baixo, com um pico pontual ao calcular entropia de seções PE (até 64 MB por seção). O
+`max_file_size` (default 100 MB) é só um teto de tempo/segurança — passe
+`--max-file-size 0` para não ter limite. Arquivos pulados aparecem como `SKIPPED` no
+relatório, com o motivo.
 
 ## Testes e lint
 
@@ -250,3 +254,6 @@ write e quebraria a suíte.
   `clamd.conf`): acima disso ele recusa e o arquivo aparece com `- clamav` no status.
 - Sem o módulo `yara-python`, o CLI do YARA é acionado por arquivo (recompila as regras
   e sobe um processo a cada item) — mais lento que o módulo numa varredura de diretório grande.
+- A quarentena é **ofuscação, não cofre**: a chave (`key.key`) fica no mesmo diretório dos
+  `.enc` e o AES-CTR não autentica o conteúdo. Sirva para tirar o arquivo do caminho, não
+  para proteger contra quem tem acesso à pasta. Restaure com `verificador restore`.

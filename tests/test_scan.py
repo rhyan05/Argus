@@ -1,5 +1,6 @@
 """Testes do scanner — EICAR 100% em memória (o Defender do host apagaria em disco)."""
 
+import os
 import sys
 import tempfile
 import types
@@ -7,8 +8,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scanner.core import EICAR, analyze_builtin, analyze_yara, hashes, iter_files, scan, scan_file
-from scanner.models import EngineResult, Finding
+from scanner.core import hashes, iter_files, scan, scan_file
+from scanner.engines import EICAR, analyze_builtin, analyze_yara
+from scanner.models import EngineResult, Finding, Result
 
 EICAR_TEXT = EICAR.decode()
 
@@ -33,9 +35,9 @@ class TestEicarDetection(unittest.TestCase):
         self.assertEqual(res.status, "ran")
 
     def test_yara_detects_eicar_with_python_module(self):
-        from scanner import core
+        from scanner import engines
 
-        if not core.HAS_YARA:
+        if not engines.HAS_YARA:
             self.skipTest("yara-python não compila em 3.14; o binário CLI é coberto por TestYaraCli")
         findings = analyze_yara(EICAR).findings
         self.assertTrue(any(f.signature == "eicar_test" for f in findings))
@@ -46,10 +48,9 @@ class TestYaraCli(unittest.TestCase):
     compila. Não testa EICAR em disco: o Defender do host bloqueia a leitura do arquivo."""
 
     def setUp(self):
-        from scanner import core
+        from scanner import engines
 
-        self.core = core
-        if core.HAS_YARA or not core.YARA_CLI:
+        if engines.HAS_YARA or not engines.YARA_CLI:
             self.skipTest("roda só quando o módulo Python falta e o binário CLI existe")
 
     def test_cli_matches_pattern_in_file(self):
@@ -94,13 +95,13 @@ class TestYaraCompileOnce(unittest.TestCase):
     diretório, cada uma relendo o rules_dir do disco."""
 
     def setUp(self):
-        from scanner import core
+        from scanner import engines
 
-        self.core = core
+        self.engines = engines
         self.compiled = []
         self.matched = []
 
-        core._compiled_rules.cache_clear()
+        engines._compiled_rules.cache_clear()
 
         # fecha sobre a lista do caso de teste: `self` dentro de FakeRules seria a própria
         # instância do fake, não o TestCase
@@ -119,22 +120,22 @@ class TestYaraCompileOnce(unittest.TestCase):
 
         fake_yara.compile = fake_compile
         patcher = patch.multiple(
-            core, HAS_YARA=True, yara=fake_yara, create=True
+            engines, HAS_YARA=True, yara=fake_yara, create=True
         )
         patcher.start()
         self.addCleanup(patcher.stop)
-        self.addCleanup(core._compiled_rules.cache_clear)
+        self.addCleanup(engines._compiled_rules.cache_clear)
 
     def test_compiles_once_for_many_files(self):
         for i in range(20):
-            self.core.analyze_yara(f"payload-{i}".encode(), "rule r { condition: false }")
+            self.engines.analyze_yara(f"payload-{i}".encode(), "rule r { condition: false }")
         self.assertEqual(len(self.compiled), 1, self.compiled)
         # o match continua acontecendo por arquivo — só a compilação foi cacheada
         self.assertEqual(len(self.matched), 20, self.matched)
 
     def test_distinct_rules_compile_separately(self):
-        self.core.analyze_yara(b"a", "rule a { condition: false }")
-        self.core.analyze_yara(b"b", "rule b { condition: false }")
+        self.engines.analyze_yara(b"a", "rule a { condition: false }")
+        self.engines.analyze_yara(b"b", "rule b { condition: false }")
         self.assertEqual(len(self.compiled), 2, self.compiled)
 
     def test_rules_dir_edits_not_picked_up_within_process(self):
@@ -144,17 +145,19 @@ class TestYaraCompileOnce(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             rules = Path(tmp) / "minha.yar"
             rules.write_text("rule x { condition: false }", encoding="utf-8")
-            self.core.analyze_yara(b"a", "", tmp)
+            self.engines.analyze_yara(b"a", "", tmp)
             rules.write_text("rule y { condition: false }", encoding="utf-8")
-            self.core.analyze_yara(b"b", "", tmp)
+            self.engines.analyze_yara(b"b", "", tmp)
         self.assertEqual(len(self.compiled), 1, self.compiled)
         self.assertIn("rule x", self.compiled[0])
         self.assertNotIn("rule y", self.compiled[0])
 
     def test_no_yara_returns_empty_without_compiling(self):
         # sem módulo E sem CLI, a engine some — não pode tentar compilar nem shell out
-        with patch.object(self.core, "HAS_YARA", False), patch.object(self.core, "YARA_CLI", None):
-            self.assertEqual(self.core.analyze_yara(b"x").findings, [])
+        with patch.object(self.engines, "HAS_YARA", False), patch.object(
+            self.engines, "YARA_CLI", None
+        ):
+            self.assertEqual(self.engines.analyze_yara(b"x").findings, [])
         self.assertEqual(self.compiled, [])
 
 
@@ -485,6 +488,14 @@ class TestCleanSemantics(unittest.TestCase):
         r = Result("x.exe", "a", "b", "c", [Finding("clamav", "Win.Test.EICAR", "malware")])
         self.assertIn("MALWARE", to_csv([r]))
 
+    def test_csv_uses_single_line_endings(self):
+        from scanner.models import Finding, Result
+        from scanner.report import to_csv
+
+        out = to_csv([Result("x", findings=[Finding("builtin", "x")]), Result("y")])
+        self.assertNotIn("\r", out)
+        self.assertEqual(len(out.splitlines()), 3)
+
 
 class TestExclude(unittest.TestCase):
     def test_exclude_kills_whole_directory(self):
@@ -764,14 +775,14 @@ class TestStreaming(unittest.TestCase):
 
     def test_eicar_match_across_chunk_boundary(self):
         # sobreposição entre blocos: assinatura partida na fronteira ainda é encontrada
-        from scanner import core
+        from scanner import engines
 
         marker = b"NEEDLE-ASSINATURA"
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "s.bin"
             p.write_bytes(b"A" * 5 + marker + b"B" * 5)
-            with patch.object(core, "EICAR", marker), patch.object(core, "CHUNK", 8):
-                self.assertTrue(core.analyze_builtin(path=p).findings)
+            with patch.object(engines, "EICAR", marker), patch.object(engines, "READ_CHUNK", 8):
+                self.assertTrue(engines.analyze_builtin(path=p).findings)
 
 
 class TestEngineRuns(unittest.TestCase):
@@ -785,16 +796,17 @@ class TestEngineRuns(unittest.TestCase):
         self.assertEqual(runs["pe"].status, "nao-aplicavel")  # não é PE
         self.assertEqual(runs["doc"].status, "nao-aplicavel")
         self.assertEqual(runs["archive"].status, "nao-aplicavel")
-        # nao-aplicavel não conta no total
-        self.assertEqual(res.engines_ran, res.engines_total)
+        # nao-aplicavel não conta no total: só builtin + yara entram
+        self.assertEqual(res.engines_total, 2)
+        self.assertEqual(res.engines_ran, 2 if runs["yara"].ran else 1)
 
     def test_unavailable_engine_counts_in_total(self):
-        from scanner import core
+        from scanner import engines
 
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "a.txt"
             p.write_bytes(b"x")
-            with patch.object(core, "HAS_YARA", False), patch.object(core, "YARA_CLI", None):
+            with patch.object(engines, "HAS_YARA", False), patch.object(engines, "YARA_CLI", None):
                 res = scan_file(p, use_clamd=False)
         yara = next(e for e in res.engine_runs if e.engine == "yara")
         self.assertEqual(yara.status, "indisponivel")
@@ -937,7 +949,7 @@ class TestVtPolicy(unittest.TestCase):
             with patch(
                 "scanner.core.analyze_builtin",
                 return_value=EngineResult([Finding("builtin", "x", "suspicious")]),
-            ), patch("scanner.core.check_vt", return_value=None) as cv:
+            ), patch("scanner.core.check_vt", return_value=(None, "")) as cv:
                 scan_file(p, use_clamd=False, vt=self._client(), vt_only_suspicious=True)
             cv.assert_called_once()
 
@@ -945,9 +957,167 @@ class TestVtPolicy(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "a.txt"
             p.write_bytes(b"limpo")
-            with patch("scanner.core.check_vt", return_value=None) as cv:
+            with patch("scanner.core.check_vt", return_value=(None, "")) as cv:
                 scan_file(p, use_clamd=False, vt=self._client())
             cv.assert_called_once()
+
+    def test_scan_file_marks_vt_skipped_on_reason(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "a.txt"
+            p.write_bytes(b"limpo")
+            with patch("scanner.core.check_vt", return_value=(None, "HTTP 429")):
+                res = scan_file(p, use_clamd=False, vt=self._client())
+        run = next(e for e in res.engine_runs if e.engine == "virustotal")
+        self.assertEqual(run.status, "indisponivel")
+        self.assertEqual(run.reason, "HTTP 429")
+
+
+class TestVtRateLimit(unittest.TestCase):
+    def test_rate_limit_returns_reason(self):
+        import urllib.error
+
+        from scanner.vt import RateLimit, VTCache, check_vt
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with VTCache(Path(tmp) / "c.db") as cache:
+                err = urllib.error.HTTPError("u", 429, "limit", {}, None)
+                with patch("scanner.vt.urllib.request.urlopen", side_effect=err):
+                    finding, reason = check_vt("a" * 64, cache, RateLimit(0), "key")
+        self.assertIsNone(finding)
+        self.assertEqual(reason, "HTTP 429")
+
+
+class TestClamdReply(unittest.TestCase):
+    def test_truncated_reply_raises_instead_of_looping(self):
+        from scanner import engines
+
+        replies = [b"stream: OK", b""]
+
+        class FakeSock:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def sendall(self, _data):
+                pass
+
+            def recv(self, _n):
+                return replies.pop(0)
+
+        with patch("scanner.engines.socket.create_connection", return_value=FakeSock()):
+            with self.assertRaises(RuntimeError):
+                engines.analyze_clamd()
+
+
+class TestProgress(unittest.TestCase):
+    def test_progress_completes_despite_skips(self):
+        calls = []
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "a.txt").write_bytes(b"ok")
+            (Path(tmp) / "b.bin").write_bytes(b"\0" * 100)
+            (Path(tmp) / "skip.tmp").write_bytes(b"x")
+            scan(
+                Path(tmp),
+                use_clamd=False,
+                max_file_size=50,
+                exclude=["skip.tmp"],
+                progress=lambda i, n, path: calls.append((i, n)),
+            )
+        self.assertEqual(calls[-1], (2, 2))
+
+
+class TestExcludeCase(unittest.TestCase):
+    @unittest.skipUnless(os.name == "nt", "case-insensitive só no Windows")
+    def test_exclude_is_case_insensitive_on_windows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "Thumbs.db").write_bytes(b"x")
+            results = scan(Path(tmp), use_clamd=False, exclude=["thumbs.db"])
+        self.assertEqual(results, [])
+
+
+class TestCliErrors(unittest.TestCase):
+    def test_missing_rules_file_returns_error(self):
+        from scanner.cli import main
+
+        with tempfile.TemporaryDirectory() as tmp:
+            rc = main(["scan", tmp, "--rules", str(Path(tmp) / "nope.yar")])
+        self.assertEqual(rc, 1)
+
+
+class TestCliOutput(unittest.TestCase):
+    def test_json_stdout_is_clean(self):
+        import contextlib
+        import io
+
+        from scanner.cli import main
+
+        buf = io.StringIO()
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "a.txt").write_bytes(b"ok")
+            with contextlib.redirect_stdout(buf):
+                rc = main(["scan", tmp, "--format", "json", "--no-vt"])
+        self.assertEqual(rc, 0)
+        self.assertTrue(buf.getvalue().startswith("["), buf.getvalue()[:40])
+
+    def test_redirected_json_is_utf8(self):
+        import subprocess
+        import sys as _sys
+
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "não.txt").write_bytes(b"ok")
+            proc = subprocess.run(
+                [_sys.executable, "-m", "scanner", "scan", tmp, "--format", "json", "--no-vt"],
+                capture_output=True,
+                cwd=str(Path(__file__).resolve().parent.parent),
+            )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("não.txt", proc.stdout.decode("utf-8"))
+
+
+class TestExitCode(unittest.TestCase):
+    def test_malware_returns_one(self):
+        from scanner.cli import main
+
+        bad = Result("x", findings=[Finding("builtin", "x", "malware")])
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("scanner.cli.scan", return_value=[bad]):
+                rc = main(["scan", tmp])
+        self.assertEqual(rc, 1)
+
+    def test_clean_returns_zero(self):
+        from scanner.cli import main
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("scanner.cli.scan", return_value=[Result("x")]):
+                rc = main(["scan", tmp])
+        self.assertEqual(rc, 0)
+
+
+class TestRestoreCommand(unittest.TestCase):
+    def test_restore_roundtrip(self):
+        from scanner.cli import main
+        from scanner.quarantine import quarantine_file
+
+        with tempfile.TemporaryDirectory() as tmp:
+            orig = Path(tmp) / "mal.exe"
+            data = b"payload de teste"
+            orig.write_bytes(data)
+            enc = Path(quarantine_file(orig, Path(tmp) / ".quar"))
+            out = Path(tmp) / "restored.exe"
+            rc = main(["restore", str(enc), "-o", str(out)])
+            self.assertEqual(rc, 0)
+            self.assertEqual(out.read_bytes(), data)
+
+    def test_restore_without_key_fails(self):
+        from scanner.cli import main
+
+        with tempfile.TemporaryDirectory() as tmp:
+            enc = Path(tmp) / "x.enc"
+            enc.write_bytes(b"junk")
+            rc = main(["restore", str(enc), "-o", str(Path(tmp) / "out")])
+        self.assertEqual(rc, 1)
 
 
 if __name__ == "__main__":

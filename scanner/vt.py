@@ -86,11 +86,17 @@ def build_client(cfg: dict | None = None) -> tuple[VTCache, RateLimit, str] | No
     return VTCache(cache_path), limiter, key
 
 
-def check_vt(sha256: str, cache: VTCache, limiter: RateLimit, api_key: str) -> Finding | None:
-    """GET /files/{hash}. Retorna Finding ou None (limpo/404/erro)."""
+def check_vt(
+    sha256: str, cache: VTCache, limiter: RateLimit, api_key: str
+) -> tuple[Finding | None, str]:
+    """GET /files/{hash}. Retorna (Finding|None, motivo).
+
+    Motivo vazio = engine rodou (inclusive cache/404, que são veredito neutro).
+    Motivo preenchido = a engine foi pulada (429, rede, resposta inválida).
+    """
     cached = cache.get(sha256)
     if cached:
-        return cached
+        return cached, ""
 
     req = urllib.request.Request(
         VT_API.format(sha256=sha256), headers={"x-apikey": api_key}
@@ -102,10 +108,10 @@ def check_vt(sha256: str, cache: VTCache, limiter: RateLimit, api_key: str) -> F
     except urllib.error.HTTPError as e:
         if e.code == 404:
             cache.put(sha256, NO_REPUTATION, "info")
-            return None
-        return None  # 429/limite
-    except (urllib.error.URLError, OSError, ValueError):
-        return None
+            return None, ""
+        return None, f"HTTP {e.code}"
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        return None, type(e).__name__
 
     malicious = stats.get("malicious", 0)
     suspicious = stats.get("suspicious", 0)
@@ -119,4 +125,4 @@ def check_vt(sha256: str, cache: VTCache, limiter: RateLimit, api_key: str) -> F
         verdict = "reputacao-limpa"
         sev = "info"
     cache.put(sha256, verdict, sev)
-    return Finding("virustotal", verdict, sev)
+    return Finding("virustotal", verdict, sev), ""

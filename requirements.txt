@@ -1,9 +1,0 @@
-# yara-python não tem wheel para Python 3.14 e exige compilador C.
-# Alternativa sem compilador: instalar o binário YARA (winget install VirusTotal.YARA);
-# o scanner usa o CLI automaticamente quando o módulo Python não está disponível.
-# yara-python
-rich
-pefile
-oletools
-py7zr
-cryptography

@@ -1,0 +1,3 @@
+Este arquivo é um exemplo limpo. Nenhuma engine deve marcar nada aqui.
+
+Pode apagar a pasta examples/ quando terminar os testes.
