@@ -1,6 +1,6 @@
 """Núcleo: hashing, travessia de arquivos e orquestração da varredura.
 
-As engines vivem em `scanner.engines`; aqui fica só o fluxo que as combina e o
+As engines vivem em `argus_av.engines`; aqui fica só o fluxo que as combina e o
 relatório por arquivo.
 """
 
@@ -10,7 +10,7 @@ import hashlib
 import os
 from pathlib import Path
 
-from scanner.engines import (
+from argus_av.engines import (
     analyze_archive,
     analyze_builtin,
     analyze_clamd,
@@ -18,7 +18,7 @@ from scanner.engines import (
     analyze_pe,
     analyze_yara,
 )
-from scanner.models import (
+from argus_av.models import (
     ACTIONABLE,
     RAN,
     SKIP_UNAVAILABLE,
@@ -27,7 +27,7 @@ from scanner.models import (
     Finding,
     Result,
 )
-from scanner.vt import check_vt
+from argus_av.vt import check_vt
 
 CHUNK = 1024 * 1024  # 1 MiB — tamanho de bloco para hashing/streaming
 
@@ -97,7 +97,7 @@ def scan_file(
         )
 
     if quarantine_dir is not None and any(f.severity == "malware" for f in findings):
-        from scanner.quarantine import quarantine_file
+        from argus_av.quarantine import quarantine_file
 
         quarantine_file(path, quarantine_dir)
 

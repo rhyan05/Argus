@@ -9,10 +9,10 @@ import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from scanner.core import scan_file
+from argus_av.core import scan_file
 
 PAGE = """<!doctype html>
-<html lang="pt"><head><meta charset="utf-8"><title>Verificador de Arquivo</title>
+<html lang="pt"><head><meta charset="utf-8"><title>Argus</title>
 <style>
   body {{ font-family: sans-serif; margin: 2em; }}
   #drop {{ border: 2px dashed #888; padding: 3em; text-align: center; border-radius: 8px; }}
@@ -23,7 +23,7 @@ PAGE = """<!doctype html>
   .info {{ color: blue; }} .clean {{ color: green; }}
 </style></head>
 <body>
-<h1>Verificador de Arquivo</h1>
+<h1>Argus</h1>
 <div id="drop"><strong>Arraste arquivos aqui</strong> ou <label><input type="file" id="files" multiple>selecione</label></div>
 <div id="out"></div>
 <script>
@@ -154,7 +154,7 @@ class Handler(BaseHTTPRequestHandler):
             p = Path(tmp) / (name + Path(safe_name).suffix)
             p.write_bytes(payload)
             res = scan_file(p, use_clamd=False)
-            from scanner.report import to_dict
+            from argus_av.report import to_dict
 
             out = to_dict(res)
             out["path"] = safe_name or name

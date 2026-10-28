@@ -26,7 +26,7 @@ from collections import Counter
 from functools import lru_cache
 from pathlib import Path
 
-from scanner.models import SKIP_NA, SKIP_UNAVAILABLE, EngineResult, Finding
+from argus_av.models import SKIP_NA, SKIP_UNAVAILABLE, EngineResult, Finding
 
 try:
     import pefile  # type: ignore
@@ -60,7 +60,7 @@ EICAR_RULE = """
 rule eicar_test {
     meta:
         description = "EICAR test signature (builtin)"
-        author = "scanner"
+        author = "argus"
     strings:
         $eicar = "X5O!P%@AP[4\\\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
     condition:
@@ -179,7 +179,7 @@ def _compiled_rules(extra_rules: str, rules_dir: str | None):
     return yara.compile(source=_rules_source(extra_rules, rules_dir))
 
 
-_CLI_RULES_DIR = tempfile.TemporaryDirectory(prefix="scanner-yara-")
+_CLI_RULES_DIR = tempfile.TemporaryDirectory(prefix="argus-yara-")
 
 
 @lru_cache(maxsize=8)
@@ -200,7 +200,7 @@ def _analyze_yara_cli(
         if path is not None:
             target = str(path)
         else:
-            fd, tmp = tempfile.mkstemp(prefix="scanner-scan-")
+            fd, tmp = tempfile.mkstemp(prefix="argus-scan-")
             with os.fdopen(fd, "wb") as f:
                 f.write(data)
             target = tmp

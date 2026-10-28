@@ -1,13 +1,13 @@
 [project]
-name = "verificador-de-arquivo"
-version = "0.1.1"
-description = "Scanner antivírus/malware local, CLI-first, com frontend local complementar"
+name = "argus-av"
+version = "0.2.0"
+description = "Argus — scanner antivírus/malware local, CLI-first, com frontend local complementar"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Rhyan Lemos Silveira" }]
 license = "MIT"
 license-files = ["LICENSE"]
-keywords = ["antivirus", "malware", "scanner", "yara", "clamav", "virustotal", "security", "cli"]
+keywords = ["antivirus", "malware", "scanner", "yara", "clamav", "virustotal", "security", "cli", "argus"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -32,22 +32,23 @@ dependencies = [
 
 [project.optional-dependencies]
 gui = ["pywebview"]
-dev = ["ruff", "pytest", "build", "twine"]
+dev = ["ruff", "pytest", "build", "twine", "python-dotenv"]
 
 [project.scripts]
-verificador = "scanner.cli:main"
+argus = "argus_av.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/rhyan05/scan-de-arquivos"
-Repository = "https://github.com/rhyan05/scan-de-arquivos"
-Issues = "https://github.com/rhyan05/scan-de-arquivos/issues"
+Homepage = "https://github.com/rhyan05/Argus"
+Repository = "https://github.com/rhyan05/Argus"
+Issues = "https://github.com/rhyan05/Argus/issues"
+Frontend = "https://github.com/rhyan05/argus-front"
 
 [build-system]
 requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["scanner"]
+packages = ["argus_av"]
 
 [tool.ruff]
 line-length = 100

@@ -1,6 +1,6 @@
 """Configuração centralizada via config.toml (tomllib — stdlib, sem dependência).
 
-Precedência: config.toml no cwd > ~/.config/scanner.toml > defaults.
+Precedência: config.toml no cwd > ~/.config/argus.toml > defaults.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ def load(path: str | Path | None = None) -> dict:
     if path is not None:
         candidates = [Path(path)]
     else:
-        candidates = [Path("config.toml"), Path.home() / ".config/scanner.toml"]
+        candidates = [Path("config.toml"), Path.home() / ".config/argus.toml"]
     for cand in candidates:
         if cand.exists():
             # utf-8-sig: tolera o BOM que o PowerShell 5.1 grava via Out-File -Encoding utf8

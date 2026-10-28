@@ -1,4 +1,4 @@
-"""CLI do verificador."""
+"""CLI do Argus."""
 
 from __future__ import annotations
 
@@ -22,8 +22,8 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from scanner.core import parse_size, scan
-from scanner.engines import (
+from argus_av.core import parse_size, scan
+from argus_av.engines import (
     HAS_OLETOOLS,
     HAS_PEFILE,
     HAS_PY7ZR,
@@ -31,12 +31,12 @@ from scanner.engines import (
     YARA_CLI,
     analyze_clamd,
 )
-from scanner.report import render
+from argus_av.report import render
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog="verificador",
+        prog="argus",
         description="Scanner antivírus/malware local.",
     )
     parser.add_argument("--config", help="Caminho do config.toml (default: ./config.toml).")
@@ -123,7 +123,7 @@ def _cmd_scan(args, cfg) -> int:
 
     vt = None
     if not args.no_vt and cfg["vt"].get("enabled", True):
-        from scanner.vt import build_client
+        from argus_av.vt import build_client
 
         vt = build_client(cfg)  # None se VT_API_KEY ausente — engine desligada silenciosamente
 
@@ -226,13 +226,13 @@ veredito por arquivo, além de quais engines rodaram.
 
 | Comando | O que faz |
 |---|---|
-| `verificador scan <arquivo-ou-pasta>` | Varre e mostra o relatório |
-| `verificador status` | Saúde das engines |
-| `verificador web` | Interface local (arrastar e soltar) |
-| `verificador restore <enc> -o <destino>` | Restaura um arquivo da quarentena |
-| `verificador update-rules <url>` | Baixa regras YARA |
+| `argus scan <arquivo-ou-pasta>` | Varre e mostra o relatório |
+| `argus status` | Saúde das engines |
+| `argus web` | Interface local (arrastar e soltar) |
+| `argus restore <enc> -o <destino>` | Restaura um arquivo da quarentena |
+| `argus update-rules <url>` | Baixa regras YARA |
 
-**Dica:** em modo de desenvolvimento (sem instalar), troque `verificador` por `python -m scanner`.
+**Dica:** em modo de desenvolvimento (sem instalar), troque `argus` por `python -m argus_av`.
 
 ## VirusTotal (opcional)
 
@@ -244,14 +244,14 @@ A engine consulta a reputação pelo **hash SHA-256** — o arquivo não é envi
 2. Configure:
    - Windows (PowerShell): `setx VT_API_KEY "sua-chave"` (reabra o terminal)
    - Linux/macOS/WSL: `export VT_API_KEY="sua-chave"`
-3. Confira com `verificador status` (deve mostrar "chave presente").
+3. Confira com `argus status` (deve mostrar "chave presente").
 
 O plano grátis limita a ~4 requisições/min. Em pastas grandes use
 `--vt-only-suspicious`; para desligar, use `--no-vt`.
 
 ## Próximo passo
 
-    verificador scan .
+    argus scan .
 
 Sem a chave do VirusTotal tudo funciona; apenas essa engine é pulada.
 """
@@ -276,7 +276,7 @@ def _cmd_update_rules(args) -> int:
 
 
 def _cmd_restore(args) -> int:
-    from scanner.quarantine import decrypt_to
+    from argus_av.quarantine import decrypt_to
 
     enc = Path(args.enc)
     if not enc.is_file():
@@ -302,7 +302,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.config and not Path(args.config).exists():
         print(f"ERRO: config não existe: {args.config}", file=sys.stderr)
         return 1
-    from scanner.config import load
+    from argus_av.config import load
 
     cfg = load(args.config)
 
@@ -317,7 +317,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "restore":
         return _cmd_restore(args)
     if args.command == "web":
-        from scanner.web import serve
+        from argus_av.web import serve
 
         if args.open:
             try:
@@ -325,7 +325,7 @@ def main(argv: list[str] | None = None) -> int:
 
                 t = threading.Thread(target=serve, args=(args.host, args.port), daemon=True)
                 t.start()
-                webview.create_window("Verificador de Arquivo", f"http://{args.host}:{args.port}")
+                webview.create_window("Argus", f"http://{args.host}:{args.port}")
                 webview.start()
                 return 0
             except ImportError:

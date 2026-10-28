@@ -10,7 +10,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from scanner.models import Finding
+from argus_av.models import Finding
 
 VT_API = "https://www.virustotal.com/api/v3/files/{sha256}"
 RATE_INTERVAL = 15.0  # free tier ~4 req/min

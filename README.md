@@ -1,4 +1,4 @@
-# Verificador de Arquivo
+# Argus
 
 Scanner antivírus/malware local, multiplataforma (PowerShell, cmd, WSL, macOS),
 **CLI-first** com frontend local complementar.
@@ -8,11 +8,11 @@ Scanner antivírus/malware local, multiplataforma (PowerShell, cmd, WSL, macOS),
 Via PyPI (recomendado):
 
 ```powershell
-pip install verificador-de-arquivo
-verificador guia
+pip install argus-av
+argus guia
 ```
 
-O comando `verificador` fica disponível no ambiente; `python -m scanner` também funciona.
+O comando `argus` fica disponível no ambiente; `python -m argus_av` também funciona.
 
 **A partir do código (desenvolvimento):** o scanner roda só com Python — as engines
 externas (ClamAV, YARA, VirusTotal) são **opcionais** e, sem elas, são ignoradas
@@ -29,8 +29,8 @@ silenciosamente no status.
 ### Passo 1 — Obter o código
 
 ```powershell
-git clone <url-do-repo> "Verificador de Arquivo"
-cd "Verificador de Arquivo"
+git clone <url-do-repo> argus
+cd argus
 ```
 
 Sem Git? Baixe o ZIP e extraia — os passos seguintes são iguais.
@@ -63,14 +63,14 @@ pip install -e ".[dev]"          # instala o scanner + ruff/pytest (modo editáv
 ```
 
 Só o essencial (sem ferramentas de dev): `pip install .`.
-O `-e .` também cria o atalho `verificador` no PATH do venv — a partir daí
-`verificador scan ...` e `python -m scanner scan ...` são equivalentes.
+O `-e .` também cria o atalho `argus` no PATH do venv — a partir daí
+`argus scan ...` e `python -m argus_av scan ...` são equivalentes.
 
 ### Passo 4 — Verificar a instalação
 
 ```powershell
-verificador status
-verificador guia      # guia rápido: engines, comandos e VirusTotal
+argus status
+argus guia      # guia rápido: engines, comandos e VirusTotal
 ```
 
 Saída esperada: uma linha por engine. As que funcionam mostram o que foi encontrado
@@ -93,7 +93,7 @@ TCPSocket 3310
 TCPAddr 127.0.0.1
 ```
 
-Depois rode `clamd.exe` (ou instale como serviço). Teste com `verificador status`.
+Depois rode `clamd.exe` (ou instale como serviço). Teste com `argus status`.
 
 **Debian/Ubuntu:**
 
@@ -144,8 +144,8 @@ para diretórios grandes, use `--vt-only-suspicious` (consulta só arquivos já 
 |---|---|---|
 | `'python' não é reconhecido` | Python fora do PATH | Reinstale marcando "Add to PATH", ou use `py -3` |
 | `Activate.ps1 ... desabilitado` | política de execução do PowerShell | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
-| `ModuleNotFoundError: scanner` | rodou fora da pasta/venv | Ative o venv e rode da raiz do projeto |
-| `'verificador' não é reconhecido` | pacote não instalado ou venv inativo | `pip install verificador-de-arquivo` no venv ativo |
+| `ModuleNotFoundError: argus_av` | rodou fora da pasta/venv | Ative o venv e rode da raiz do projeto |
+| `'argus' não é reconhecido` | pacote não instalado ou venv inativo | `pip install argus-av` no venv ativo |
 | engine `clamav` = `-` (ConnectionRefusedError) | `clamd` não está rodando | Inicie o `clamd` e confira `TCPSocket 3310` |
 | engine `yara` = `-` | binário fora do PATH | Instale o YARA ou defina `YARA_PATH` |
 | `status` mostra `virustotal: sem VT_API_KEY` | chave ausente | Exporte a chave e reabra o terminal |
@@ -154,22 +154,22 @@ para diretórios grandes, use `--vt-only-suspicious` (consulta só arquivos já 
 ## Uso rápido
 
 ```powershell
-verificador guia                             # tutorial: engines, uso e como configurar o VirusTotal
-verificador scan C:\pasta                    # console com barra de progresso
-verificador scan C:\pasta --format json
-verificador scan C:\pasta --format csv
-verificador scan C:\pasta --format html
-verificador scan C:\pasta --quarantine        # move malware p/ .quar cifrado (AES-256)
-verificador scan C:\pasta --rules minhas.yar
-verificador scan C:\pasta --rules-dir rules   # carrega todos os *.yar
-verificador --config examples/config.toml scan examples/arquivos  # exemplos do repositório
-verificador scan C:\pasta --max-file-size 1g  # inclui arquivos grandes (0 = ilimitado)
-verificador scan C:\pasta --vt-only-suspicious # VirusTotal só em suspeitos (poupa rate limit)
-verificador status                            # saúde das engines (inclui ping real no clamd)
-verificador restore .quar/foo.exe.ab12cd34.enc -o foo.exe  # restaura da quarentena
-verificador web                               # frontend: http://127.0.0.1:8080
-verificador web --open                        # janela nativa (pip install -e ".[gui]")
-verificador update-rules <url>                # baixa regras YARA p/ rules/
+argus guia                             # tutorial: engines, uso e como configurar o VirusTotal
+argus scan C:\pasta                    # console com barra de progresso
+argus scan C:\pasta --format json
+argus scan C:\pasta --format csv
+argus scan C:\pasta --format html
+argus scan C:\pasta --quarantine        # move malware p/ .quar cifrado (AES-256)
+argus scan C:\pasta --rules minhas.yar
+argus scan C:\pasta --rules-dir rules   # carrega todos os *.yar
+argus --config examples/config.toml scan examples/arquivos  # exemplos do repositório
+argus scan C:\pasta --max-file-size 1g  # inclui arquivos grandes (0 = ilimitado)
+argus scan C:\pasta --vt-only-suspicious # VirusTotal só em suspeitos (poupa rate limit)
+argus status                            # saúde das engines (inclui ping real no clamd)
+argus restore .quar/foo.exe.ab12cd34.enc -o foo.exe  # restaura da quarentena
+argus web                               # frontend: http://127.0.0.1:8080
+argus web --open                        # janela nativa (pip install -e ".[gui]")
+argus update-rules <url>                # baixa regras YARA p/ rules/
 ```
 
 `scan` retorna código de saída `1` quando encontra malware (e `0` quando só há
@@ -177,7 +177,7 @@ suspeitas/observações), para uso em scripts e CI.
 
 ## Configuração (`config.toml`)
 
-Procurado em `./config.toml`, depois `~/.config/scanner.toml`. Valores ausentes usam defaults.
+Procurado em `./config.toml`, depois `~/.config/argus.toml`. Valores ausentes usam defaults.
 
 ```toml
 exclude = ["cache.tmp", "thumbs.db", "node_modules"]  # casa com QUALQUER componente do caminho
@@ -256,4 +256,4 @@ write e quebraria a suíte.
   e sobe um processo a cada item) — mais lento que o módulo numa varredura de diretório grande.
 - A quarentena é **ofuscação, não cofre**: a chave (`key.key`) fica no mesmo diretório dos
   `.enc` e o AES-CTR não autentica o conteúdo. Sirva para tirar o arquivo do caminho, não
-  para proteger contra quem tem acesso à pasta. Restaure com `verificador restore`.
+  para proteger contra quem tem acesso à pasta. Restaure com `argus restore`.

@@ -10,7 +10,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from scanner.models import ACTIONABLE, COUNTED_SKIPS, SKIP_NA, Result
+from argus_av.models import ACTIONABLE, COUNTED_SKIPS, SKIP_NA, Result
 
 console = Console()
 

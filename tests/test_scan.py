@@ -8,9 +8,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scanner.core import hashes, iter_files, scan, scan_file
-from scanner.engines import EICAR, analyze_builtin, analyze_yara
-from scanner.models import EngineResult, Finding, Result
+from argus_av.core import hashes, iter_files, scan, scan_file
+from argus_av.engines import EICAR, analyze_builtin, analyze_yara
+from argus_av.models import EngineResult, Finding, Result
 
 EICAR_TEXT = EICAR.decode()
 
@@ -35,7 +35,7 @@ class TestEicarDetection(unittest.TestCase):
         self.assertEqual(res.status, "ran")
 
     def test_yara_detects_eicar_with_python_module(self):
-        from scanner import engines
+        from argus_av import engines
 
         if not engines.HAS_YARA:
             self.skipTest("yara-python não compila em 3.14; o binário CLI é coberto por TestYaraCli")
@@ -48,7 +48,7 @@ class TestYaraCli(unittest.TestCase):
     compila. Não testa EICAR em disco: o Defender do host bloqueia a leitura do arquivo."""
 
     def setUp(self):
-        from scanner import engines
+        from argus_av import engines
 
         if engines.HAS_YARA or not engines.YARA_CLI:
             self.skipTest("roda só quando o módulo Python falta e o binário CLI existe")
@@ -95,7 +95,7 @@ class TestYaraCompileOnce(unittest.TestCase):
     diretório, cada uma relendo o rules_dir do disco."""
 
     def setUp(self):
-        from scanner import engines
+        from argus_av import engines
 
         self.engines = engines
         self.compiled = []
@@ -181,12 +181,12 @@ class TestScanFile(unittest.TestCase):
 
 class TestPhase2(unittest.TestCase):
     def test_entropy_low_for_plain_text(self):
-        from scanner.engines import shannon_entropy
+        from argus_av.engines import shannon_entropy
 
         self.assertLess(shannon_entropy(b"a" * 1000), 0.1)
 
     def test_entropy_high_for_random_bytes(self):
-        from scanner.engines import shannon_entropy
+        from argus_av.engines import shannon_entropy
 
         self.assertGreater(shannon_entropy(bytes(range(256)) * 4), 7.9)
 
@@ -195,7 +195,7 @@ class TestPhase2(unittest.TestCase):
         import io
         import zipfile
 
-        from scanner.engines import analyze_archive
+        from argus_av.engines import analyze_archive
 
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -208,7 +208,7 @@ class TestPhase2(unittest.TestCase):
         import io
         import zipfile
 
-        from scanner.engines import analyze_archive
+        from argus_av.engines import analyze_archive
 
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -221,7 +221,7 @@ class TestPhase2(unittest.TestCase):
         import io
         import zipfile
 
-        from scanner.engines import analyze_archive
+        from argus_av.engines import analyze_archive
 
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -235,7 +235,7 @@ class TestPhase2(unittest.TestCase):
         import io
         import zipfile
 
-        from scanner.engines import analyze_archive
+        from argus_av.engines import analyze_archive
 
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:
@@ -243,7 +243,7 @@ class TestPhase2(unittest.TestCase):
         analyze_archive("x.zip", buf.getvalue())  # não deve levantar
 
     def test_pe_python_exe_parsed(self):
-        from scanner.engines import HAS_PEFILE, analyze_pe
+        from argus_av.engines import HAS_PEFILE, analyze_pe
 
         if not HAS_PEFILE or not sys.executable.lower().endswith(".exe"):
             self.skipTest("pefile ausente ou não estamos no Windows")
@@ -254,7 +254,7 @@ class TestPhase2(unittest.TestCase):
         self.assertTrue(any(f.signature.startswith("assinatura-digital") for f in findings))
 
     def test_docs_macro_detected(self):
-        from scanner.engines import HAS_OLETOOLS, analyze_docs
+        from argus_av.engines import HAS_OLETOOLS, analyze_docs
 
         if not HAS_OLETOOLS:
             self.skipTest("oletools ausente")
@@ -264,7 +264,7 @@ class TestPhase2(unittest.TestCase):
 
 class TestPhase3(unittest.TestCase):
     def test_vt_cache_roundtrip(self):
-        from scanner.vt import VTCache
+        from argus_av.vt import VTCache
 
         with tempfile.TemporaryDirectory() as tmp:
             with VTCache(Path(tmp) / "cache.db") as cache:
@@ -279,7 +279,7 @@ class TestPhase3(unittest.TestCase):
     def test_vt_cache_preserves_severity(self):
         # Regressão: o cache devolvia severity fixa "info", então o 2o scan do mesmo
         # malware perdia a severidade e a quarentena não disparava.
-        from scanner.vt import VTCache
+        from argus_av.vt import VTCache
 
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "cache.db"
@@ -291,7 +291,7 @@ class TestPhase3(unittest.TestCase):
             self.assertTrue(any(f.severity == "malware" for f in [f]))
 
     def test_vt_cache_no_reputation_is_not_a_finding(self):
-        from scanner.vt import NO_REPUTATION, VTCache
+        from argus_av.vt import NO_REPUTATION, VTCache
 
         with tempfile.TemporaryDirectory() as tmp:
             with VTCache(Path(tmp) / "cache.db") as cache:
@@ -302,7 +302,7 @@ class TestPhase3(unittest.TestCase):
         # cache de versão anterior não tinha a coluna severity
         import sqlite3
 
-        from scanner.vt import VTCache
+        from argus_av.vt import VTCache
 
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "old.db"
@@ -324,7 +324,7 @@ class TestPhase3(unittest.TestCase):
         import os
         from unittest.mock import patch
 
-        from scanner.vt import build_client
+        from argus_av.vt import build_client
 
         with tempfile.TemporaryDirectory() as tmp:
             env = {"VT_API_KEY": "fake-key", "VT_CACHE": str(Path(tmp) / "sub" / "vt.db")}
@@ -342,7 +342,7 @@ class TestPhase3(unittest.TestCase):
         import os
         from unittest.mock import patch
 
-        from scanner.vt import build_client
+        from argus_av.vt import build_client
 
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "a.txt"
@@ -351,12 +351,12 @@ class TestPhase3(unittest.TestCase):
             with patch.dict(os.environ, env, clear=False):
                 client = build_client({})
             client[1].interval = 0.0
-            with patch("scanner.vt.VT_API", "http://127.0.0.1:9/v3/files/{sha256}"):
+            with patch("argus_av.vt.VT_API", "http://127.0.0.1:9/v3/files/{sha256}"):
                 results = scan(target, use_clamd=False, vt=client)
             self.assertEqual(len(results), 1)
 
     def test_quarantine_encrypt_and_restore(self):
-        from scanner.quarantine import decrypt_to, load_key, quarantine_file
+        from argus_av.quarantine import decrypt_to, load_key, quarantine_file
 
         with tempfile.TemporaryDirectory() as tmp:
             orig = Path(tmp) / "mal.exe"
@@ -378,7 +378,7 @@ class TestPhase3(unittest.TestCase):
 
     def test_quarantine_streams_large_file(self):
         # Regressão: a quarentena relia o arquivo inteiro (read_bytes). Agora cifra em blocos.
-        from scanner.quarantine import CHUNK, decrypt_to, load_key, quarantine_file
+        from argus_av.quarantine import CHUNK, decrypt_to, load_key, quarantine_file
 
         with tempfile.TemporaryDirectory() as tmp:
             orig = Path(tmp) / "grande.bin"
@@ -391,7 +391,7 @@ class TestPhase3(unittest.TestCase):
             self.assertEqual(out.read_bytes(), data)
 
     def test_quarantine_manifest_is_append_only(self):
-        from scanner.quarantine import quarantine_file
+        from argus_av.quarantine import quarantine_file
 
         with tempfile.TemporaryDirectory() as tmp:
             quar = Path(tmp) / ".quar"
@@ -410,7 +410,7 @@ class TestPhase3(unittest.TestCase):
             p = Path(tmp) / "mal.bin"
             p.write_bytes(b"payload normal, sem EICAR em disco")
             with patch(
-                "scanner.core.analyze_builtin",
+                "argus_av.core.analyze_builtin",
                 return_value=EngineResult([Finding("builtin", "x", "malware")]),
             ):
                 res = scan_file(p, use_clamd=False)
@@ -421,18 +421,18 @@ class TestPhase3(unittest.TestCase):
     def test_scan_file_quarantines_malware(self):
         from unittest.mock import patch
 
-        from scanner.quarantine import quarantine_file
+        from argus_av.quarantine import quarantine_file
 
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "mal.bin"
             p.write_bytes(b"payload")
             quar = Path(tmp) / ".quar"
             with patch(
-                "scanner.quarantine.quarantine_file",
+                "argus_av.quarantine.quarantine_file",
                 wraps=quarantine_file,
             ) as qf:
                 with patch(
-                    "scanner.core.analyze_builtin",
+                    "argus_av.core.analyze_builtin",
                     return_value=EngineResult([Finding("builtin", "x", "malware")]),
                 ):
                     scan_file(p, use_clamd=False, quarantine_dir=quar)
@@ -441,7 +441,7 @@ class TestPhase3(unittest.TestCase):
             self.assertTrue(list(quar.glob("*.enc")))
 
     def test_html_report_renders(self):
-        from scanner.report import to_html
+        from argus_av.report import to_html
 
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "x.bin"
@@ -456,25 +456,25 @@ class TestCleanSemantics(unittest.TestCase):
     def test_info_only_is_clean(self):
         # Regressão: clean = not findings marcava como DETECTED qualquer observação
         # (assinatura digital presente, "reputacao-limpa").
-        from scanner.models import Finding, Result
+        from argus_av.models import Finding, Result
 
         r = Result("x.exe", "a", "b", "c", [Finding("pe", "assinatura-digital (PSF)", "info")])
         self.assertTrue(r.clean)
 
     def test_suspicious_is_not_clean(self):
-        from scanner.models import Finding, Result
+        from argus_av.models import Finding, Result
 
         r = Result("x.exe", "a", "b", "c", [Finding("pe", "ASLR-desabilitado", "suspicious")])
         self.assertFalse(r.clean)
 
     def test_no_findings_is_clean(self):
-        from scanner.models import Result
+        from argus_av.models import Result
 
         self.assertTrue(Result("x.exe", "a", "b", "c").clean)
 
     def test_report_does_not_say_detected_for_info(self):
-        from scanner.models import Finding, Result
-        from scanner.report import to_csv, to_html
+        from argus_av.models import Finding, Result
+        from argus_av.report import to_csv, to_html
 
         r = Result("x.exe", "a", "b", "c", [Finding("pe", "assinatura-digital", "info")])
         self.assertIn("OK", to_csv([r]))
@@ -482,15 +482,15 @@ class TestCleanSemantics(unittest.TestCase):
         self.assertNotIn("DETECTED", to_csv([r]))
 
     def test_malware_reported_as_malware_not_detected(self):
-        from scanner.models import Finding, Result
-        from scanner.report import to_csv
+        from argus_av.models import Finding, Result
+        from argus_av.report import to_csv
 
         r = Result("x.exe", "a", "b", "c", [Finding("clamav", "Win.Test.EICAR", "malware")])
         self.assertIn("MALWARE", to_csv([r]))
 
     def test_csv_uses_single_line_endings(self):
-        from scanner.models import Finding, Result
-        from scanner.report import to_csv
+        from argus_av.models import Finding, Result
+        from argus_av.report import to_csv
 
         out = to_csv([Result("x", findings=[Finding("builtin", "x")]), Result("y")])
         self.assertNotIn("\r", out)
@@ -527,7 +527,7 @@ class TestExclude(unittest.TestCase):
 
 class TestPhase4(unittest.TestCase):
     def test_config_defaults_and_merge(self):
-        from scanner.config import load
+        from argus_av.config import load
 
         with tempfile.TemporaryDirectory() as tmp:
             cfg_path = Path(tmp) / "config.toml"
@@ -570,7 +570,7 @@ class TestPhase4(unittest.TestCase):
             env = dict(_sys.modules.get("os").environ)
             env.pop("VT_API_KEY", None)
             proc = subprocess.run(
-                [_sys.executable, "-m", "scanner", "scan", tmp, "--format", "json", "--no-vt"],
+                [_sys.executable, "-m", "argus_av", "scan", tmp, "--format", "json", "--no-vt"],
                 capture_output=True,
                 text=True,
                 cwd=str(Path(__file__).resolve().parent.parent),
@@ -591,7 +591,7 @@ class TestPhase4(unittest.TestCase):
         env = dict(os.environ)
         env.pop("VT_API_KEY", None)
         proc = subprocess.run(
-            [_sys.executable, "-m", "scanner", "scan", str(Path(tempfile.gettempdir()) / "nao_existe_xyz")],
+            [_sys.executable, "-m", "argus_av", "scan", str(Path(tempfile.gettempdir()) / "nao_existe_xyz")],
             capture_output=True,
             text=True,
             cwd=str(Path(__file__).resolve().parent.parent),
@@ -609,7 +609,7 @@ class TestPhase4(unittest.TestCase):
             env = dict(os.environ)
             env.pop("VT_API_KEY", None)
             proc = subprocess.run(
-                [_sys.executable, "-m", "scanner", "scan", tmp, "--no-vt", "--no-clamd"],
+                [_sys.executable, "-m", "argus_av", "scan", tmp, "--no-vt", "--no-clamd"],
                 capture_output=True,
                 text=True,
                 cwd=str(Path(__file__).resolve().parent.parent),
@@ -618,7 +618,7 @@ class TestPhase4(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stderr)
 
     def test_guia_parsed_as_command(self):
-        from scanner.cli import parse_args
+        from argus_av.cli import parse_args
 
         self.assertEqual(parse_args(["guia"]).command, "guia")
 
@@ -627,10 +627,10 @@ class TestPhase4(unittest.TestCase):
         import contextlib
         import io
 
-        from scanner.cli import _cmd_guia
-        from scanner.config import load
+        from argus_av.cli import _cmd_guia
+        from argus_av.config import load
 
-        with patch("scanner.core.analyze_clamd", side_effect=ConnectionError):
+        with patch("argus_av.core.analyze_clamd", side_effect=ConnectionError):
             with contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(_cmd_guia(load()), 0)
 
@@ -640,7 +640,7 @@ def _fake_handler(filename: str, payload: bytes, content_length: int | None = -1
 
     content_length=-1 usa len(body); None omite o header (simula cliente malformado).
     """
-    from scanner.web import Handler
+    from argus_av.web import Handler
 
     boundary = "X-YAR-BOUND"
     body = (
@@ -667,7 +667,7 @@ def _fake_handler(filename: str, payload: bytes, content_length: int | None = -1
 
 class TestPhase5(unittest.TestCase):
     def test_multipart_field_parsed(self):
-        from scanner.web import _read_part
+        from argus_av.web import _read_part
 
         boundary = b"----abc"
         data = (
@@ -692,7 +692,7 @@ class TestPhase5(unittest.TestCase):
         captured = _fake_handler("e.bin", body)
 
         with patch(
-            "scanner.core.analyze_builtin",
+            "argus_av.core.analyze_builtin",
             return_value=EngineResult([Finding("builtin", "x", "malware")]),
         ):
             captured["handler"].do_POST()
@@ -708,7 +708,7 @@ class TestPhase5(unittest.TestCase):
 
     def test_upload_above_limit_rejected(self):
         # sem teto, um POST enorme vira OOM — scan_file lê o arquivo inteiro em memória
-        from scanner.web import MAX_UPLOAD
+        from argus_av.web import MAX_UPLOAD
 
         body = b"x" * 16
         captured = _fake_handler("e.bin", body, content_length=MAX_UPLOAD + 1)
@@ -734,7 +734,7 @@ class TestPhase5(unittest.TestCase):
 
         captured = _fake_handler("mal.doc", b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")
         with patch(
-            "scanner.core.analyze_docs",
+            "argus_av.core.analyze_docs",
             return_value=EngineResult([Finding("doc", "macro-autoexec:Auto_Open", "malware")]),
         ) as ad:
             captured["handler"].do_POST()
@@ -746,7 +746,7 @@ class TestStreaming(unittest.TestCase):
     """O scan não pode carregar o arquivo inteiro em memória — hashing e EICAR são em blocos."""
 
     def test_hash_file_matches_in_memory(self):
-        from scanner.core import hash_file
+        from argus_av.core import hash_file
 
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "big.bin"
@@ -755,7 +755,7 @@ class TestStreaming(unittest.TestCase):
             self.assertEqual(hash_file(p), hashes(data))
 
     def test_hash_file_uses_multiple_chunks(self):
-        from scanner import core
+        from argus_av import core
 
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "x.bin"
@@ -775,7 +775,7 @@ class TestStreaming(unittest.TestCase):
 
     def test_eicar_match_across_chunk_boundary(self):
         # sobreposição entre blocos: assinatura partida na fronteira ainda é encontrada
-        from scanner import engines
+        from argus_av import engines
 
         marker = b"NEEDLE-ASSINATURA"
         with tempfile.TemporaryDirectory() as tmp:
@@ -801,7 +801,7 @@ class TestEngineRuns(unittest.TestCase):
         self.assertEqual(res.engines_ran, 2 if runs["yara"].ran else 1)
 
     def test_unavailable_engine_counts_in_total(self):
-        from scanner import engines
+        from argus_av import engines
 
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "a.txt"
@@ -833,7 +833,7 @@ class TestEngineRuns(unittest.TestCase):
 
 class TestParseSize(unittest.TestCase):
     def test_units_and_raw(self):
-        from scanner.core import parse_size
+        from argus_av.core import parse_size
 
         self.assertEqual(parse_size("1024"), 1024)
         self.assertEqual(parse_size("1k"), 1024)
@@ -842,7 +842,7 @@ class TestParseSize(unittest.TestCase):
         self.assertEqual(parse_size("0"), 0)
 
     def test_invalid_raises(self):
-        from scanner.core import parse_size
+        from argus_av.core import parse_size
 
         with self.assertRaises(ValueError):
             parse_size("abc")
@@ -850,12 +850,12 @@ class TestParseSize(unittest.TestCase):
 
 class TestSkipAndEngineRendering(unittest.TestCase):
     def _skipped(self):
-        from scanner.models import Result
+        from argus_av.models import Result
 
         return Result("C:\\x\\grande.bin", skip_reason="maior que o limite (100 MB)")
 
     def test_skip_rendered_everywhere(self):
-        from scanner.report import to_csv, to_html, to_json
+        from argus_av.report import to_csv, to_html, to_json
 
         r = self._skipped()
         self.assertIn("SKIPPED", to_csv([r]))
@@ -869,8 +869,8 @@ class TestSkipAndEngineRendering(unittest.TestCase):
 
         from rich.console import Console
 
-        from scanner import report
-        from scanner.models import EngineRun, Finding, Result
+        from argus_av import report
+        from argus_av.models import EngineRun, Finding, Result
 
         r = Result(
             "x.exe",
@@ -896,8 +896,8 @@ class TestSkipAndEngineRendering(unittest.TestCase):
         self.assertIn("clamav", out)
 
     def test_dict_has_engine_summary(self):
-        from scanner.models import EngineRun, Result
-        from scanner.report import to_dict
+        from argus_av.models import EngineRun, Result
+        from argus_av.report import to_dict
 
         r = Result("x", "a", "b", "c", [], [EngineRun("pe", "ran"), EngineRun("doc", "nao-aplicavel")])
         d = to_dict(r)
@@ -909,7 +909,7 @@ class TestSkipAndEngineRendering(unittest.TestCase):
 class TestRobustness(unittest.TestCase):
     def test_unreadable_file_does_not_abort_scan(self):
         # Regressão: um arquivo travado/sem permissão não pode derrubar a varredura inteira.
-        from scanner import core
+        from argus_av import core
 
         with tempfile.TemporaryDirectory() as tmp:
             (Path(tmp) / "ok.txt").write_text("ok")
@@ -921,7 +921,7 @@ class TestRobustness(unittest.TestCase):
                     raise PermissionError("em uso por outro processo")
                 return real(p)
 
-            with patch("scanner.core.hash_file", side_effect=fake):
+            with patch("argus_av.core.hash_file", side_effect=fake):
                 results = scan(Path(tmp), use_clamd=False)
         by = {Path(r.path).name: r for r in results}
         self.assertEqual(len(results), 2)
@@ -938,7 +938,7 @@ class TestVtPolicy(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "a.txt"
             p.write_bytes(b"conteudo limpo")
-            with patch("scanner.core.check_vt") as cv:
+            with patch("argus_av.core.check_vt") as cv:
                 scan_file(p, use_clamd=False, vt=self._client(), vt_only_suspicious=True)
             cv.assert_not_called()  # não gasta o rate limit num arquivo já limpo
 
@@ -947,9 +947,9 @@ class TestVtPolicy(unittest.TestCase):
             p = Path(tmp) / "a.bin"
             p.write_bytes(b"x")
             with patch(
-                "scanner.core.analyze_builtin",
+                "argus_av.core.analyze_builtin",
                 return_value=EngineResult([Finding("builtin", "x", "suspicious")]),
-            ), patch("scanner.core.check_vt", return_value=(None, "")) as cv:
+            ), patch("argus_av.core.check_vt", return_value=(None, "")) as cv:
                 scan_file(p, use_clamd=False, vt=self._client(), vt_only_suspicious=True)
             cv.assert_called_once()
 
@@ -957,7 +957,7 @@ class TestVtPolicy(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "a.txt"
             p.write_bytes(b"limpo")
-            with patch("scanner.core.check_vt", return_value=(None, "")) as cv:
+            with patch("argus_av.core.check_vt", return_value=(None, "")) as cv:
                 scan_file(p, use_clamd=False, vt=self._client())
             cv.assert_called_once()
 
@@ -965,7 +965,7 @@ class TestVtPolicy(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "a.txt"
             p.write_bytes(b"limpo")
-            with patch("scanner.core.check_vt", return_value=(None, "HTTP 429")):
+            with patch("argus_av.core.check_vt", return_value=(None, "HTTP 429")):
                 res = scan_file(p, use_clamd=False, vt=self._client())
         run = next(e for e in res.engine_runs if e.engine == "virustotal")
         self.assertEqual(run.status, "indisponivel")
@@ -976,12 +976,12 @@ class TestVtRateLimit(unittest.TestCase):
     def test_rate_limit_returns_reason(self):
         import urllib.error
 
-        from scanner.vt import RateLimit, VTCache, check_vt
+        from argus_av.vt import RateLimit, VTCache, check_vt
 
         with tempfile.TemporaryDirectory() as tmp:
             with VTCache(Path(tmp) / "c.db") as cache:
                 err = urllib.error.HTTPError("u", 429, "limit", {}, None)
-                with patch("scanner.vt.urllib.request.urlopen", side_effect=err):
+                with patch("argus_av.vt.urllib.request.urlopen", side_effect=err):
                     finding, reason = check_vt("a" * 64, cache, RateLimit(0), "key")
         self.assertIsNone(finding)
         self.assertEqual(reason, "HTTP 429")
@@ -989,7 +989,7 @@ class TestVtRateLimit(unittest.TestCase):
 
 class TestClamdReply(unittest.TestCase):
     def test_truncated_reply_raises_instead_of_looping(self):
-        from scanner import engines
+        from argus_av import engines
 
         replies = [b"stream: OK", b""]
 
@@ -1006,7 +1006,7 @@ class TestClamdReply(unittest.TestCase):
             def recv(self, _n):
                 return replies.pop(0)
 
-        with patch("scanner.engines.socket.create_connection", return_value=FakeSock()):
+        with patch("argus_av.engines.socket.create_connection", return_value=FakeSock()):
             with self.assertRaises(RuntimeError):
                 engines.analyze_clamd()
 
@@ -1039,7 +1039,7 @@ class TestExcludeCase(unittest.TestCase):
 
 class TestCliErrors(unittest.TestCase):
     def test_missing_rules_file_returns_error(self):
-        from scanner.cli import main
+        from argus_av.cli import main
 
         with tempfile.TemporaryDirectory() as tmp:
             rc = main(["scan", tmp, "--rules", str(Path(tmp) / "nope.yar")])
@@ -1051,7 +1051,7 @@ class TestCliOutput(unittest.TestCase):
         import contextlib
         import io
 
-        from scanner.cli import main
+        from argus_av.cli import main
 
         buf = io.StringIO()
         with tempfile.TemporaryDirectory() as tmp:
@@ -1068,7 +1068,7 @@ class TestCliOutput(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             (Path(tmp) / "não.txt").write_bytes(b"ok")
             proc = subprocess.run(
-                [_sys.executable, "-m", "scanner", "scan", tmp, "--format", "json", "--no-vt"],
+                [_sys.executable, "-m", "argus_av", "scan", tmp, "--format", "json", "--no-vt"],
                 capture_output=True,
                 cwd=str(Path(__file__).resolve().parent.parent),
             )
@@ -1078,27 +1078,27 @@ class TestCliOutput(unittest.TestCase):
 
 class TestExitCode(unittest.TestCase):
     def test_malware_returns_one(self):
-        from scanner.cli import main
+        from argus_av.cli import main
 
         bad = Result("x", findings=[Finding("builtin", "x", "malware")])
         with tempfile.TemporaryDirectory() as tmp:
-            with patch("scanner.cli.scan", return_value=[bad]):
+            with patch("argus_av.cli.scan", return_value=[bad]):
                 rc = main(["scan", tmp])
         self.assertEqual(rc, 1)
 
     def test_clean_returns_zero(self):
-        from scanner.cli import main
+        from argus_av.cli import main
 
         with tempfile.TemporaryDirectory() as tmp:
-            with patch("scanner.cli.scan", return_value=[Result("x")]):
+            with patch("argus_av.cli.scan", return_value=[Result("x")]):
                 rc = main(["scan", tmp])
         self.assertEqual(rc, 0)
 
 
 class TestRestoreCommand(unittest.TestCase):
     def test_restore_roundtrip(self):
-        from scanner.cli import main
-        from scanner.quarantine import quarantine_file
+        from argus_av.cli import main
+        from argus_av.quarantine import quarantine_file
 
         with tempfile.TemporaryDirectory() as tmp:
             orig = Path(tmp) / "mal.exe"
@@ -1111,7 +1111,7 @@ class TestRestoreCommand(unittest.TestCase):
             self.assertEqual(out.read_bytes(), data)
 
     def test_restore_without_key_fails(self):
-        from scanner.cli import main
+        from argus_av.cli import main
 
         with tempfile.TemporaryDirectory() as tmp:
             enc = Path(tmp) / "x.enc"
