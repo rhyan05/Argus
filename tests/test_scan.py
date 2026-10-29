@@ -336,6 +336,29 @@ class TestPhase3(unittest.TestCase):
             self.assertTrue((Path(tmp) / "sub" / "vt.db").exists())  # pai criado
             cache.close()
 
+    def test_build_client_falls_back_when_cache_unwritable(self):
+        # Regressão: cwd somente leitura (ex.: perfil de outro usuário) estourava
+        # PermissionError ao criar .quar; agora cai para um cache em %TEMP%.
+        import os
+        from unittest.mock import patch
+
+        from argus_av.vt import build_client
+
+        calls = []
+
+        class FakeCache:
+            def __init__(self, path):
+                calls.append(Path(path))
+                if len(calls) == 1:
+                    raise PermissionError("sem escrita")
+
+        env = {"VT_API_KEY": "fake", "VT_CACHE": "C:/sem/permissao/vt.db"}
+        with patch.dict(os.environ, env, clear=False), patch("argus_av.vt.VTCache", FakeCache):
+            client = build_client({})
+        self.assertIsNotNone(client)
+        self.assertEqual(len(calls), 2)
+        self.assertIn("argus-vt-cache.db", calls[-1].name)
+
     def test_scan_with_vt_engine_does_not_crash(self):
         # ponta a ponta do unpack: scan() inteiro com um cliente VT real (rate limit 0,
         # rede barrada por URL inválida — só importa não estourar)

@@ -138,6 +138,14 @@ export VT_API_KEY="sua-chave"         # Linux/macOS/WSL
 Sem a chave, a engine é ignorada. O plano grátis limita a ~15 s entre requisições —
 para diretórios grandes, use `--vt-only-suspicious` (consulta só arquivos já suspeitos).
 
+Se você rodar em uma pasta **sem permissão de escrita** (por exemplo, o perfil de outro
+usuário), o cache `.quar` pode falhar. O Argus cai automaticamente para um cache em
+`%TEMP%`, mas se preferir desligar a consulta use **`--no-vt`**:
+
+```powershell
+argus scan C:\pasta --no-vt
+```
+
 ### Solução de problemas
 
 | Sintoma | Causa provável | Solução |
@@ -147,6 +155,7 @@ para diretórios grandes, use `--vt-only-suspicious` (consulta só arquivos já 
 | `ModuleNotFoundError: argus_av` | rodou fora da pasta/venv | Ative o venv e rode da raiz do projeto |
 | `'argus' não é reconhecido` | pacote não instalado ou venv inativo | `pip install argus-av` no venv ativo |
 | engine `clamav` = `-` (ConnectionRefusedError) | `clamd` não está rodando | Inicie o `clamd` e confira `TCPSocket 3310` |
+| `PermissionError: '.quar'` | pasta atual sem permissão de escrita | Use `--no-vt` ou rode de uma pasta gravável |
 | engine `yara` = `-` | binário fora do PATH | Instale o YARA ou defina `YARA_PATH` |
 | `status` mostra `virustotal: sem VT_API_KEY` | chave ausente | Exporte a chave e reabra o terminal |
 | arquivos pulados como `SKIPPED` | acima de `max_file_size` (100 MB) | Use `--max-file-size 1g` ou `0` (ilimitado) |

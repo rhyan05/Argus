@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -82,8 +83,13 @@ def build_client(cfg: dict | None = None) -> tuple[VTCache, RateLimit, str] | No
         return None
     vt_cfg = (cfg or {}).get("vt", {})
     cache_path = Path(os.environ.get("VT_CACHE", vt_cfg.get("cache", ".quar/vt-cache.db")))
+    try:
+        cache = VTCache(cache_path)
+    except OSError:
+        # diretório de cache sem escrita (ex.: cwd de outro usuário): cai para %TEMP%
+        cache = VTCache(Path(tempfile.gettempdir()) / "argus-vt-cache.db")
     limiter = RateLimit(float(vt_cfg.get("rate_interval", RATE_INTERVAL)))
-    return VTCache(cache_path), limiter, key
+    return cache, limiter, key
 
 
 def check_vt(
